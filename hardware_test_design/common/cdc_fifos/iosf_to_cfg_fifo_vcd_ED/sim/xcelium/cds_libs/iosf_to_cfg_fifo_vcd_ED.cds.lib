@@ -1,0 +1,5 @@
+
+DEFINE                     work                    ./../libraries/work/                   
+DEFINE                     iosf_to_cfg_fifo_vcd_ED ./../libraries/iosf_to_cfg_fifo_vcd_ED/
+INCLUDE simulator.cds.lib                                                                 
+SOFTINCLUDE device.cds.lib                                                                

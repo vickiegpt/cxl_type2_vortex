@@ -1,0 +1,5 @@
+
+DEFINE                     work    ./../libraries/work/   
+DEFINE                     ccv_afu ./../libraries/ccv_afu/
+INCLUDE simulator.cds.lib                                 
+SOFTINCLUDE device.cds.lib                                

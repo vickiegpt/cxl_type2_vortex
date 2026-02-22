@@ -1,0 +1,5 @@
+
+DEFINE                     work              ./../libraries/work/             
+DEFINE                     usr_access_master ./../libraries/usr_access_master/
+INCLUDE simulator.cds.lib                                                     
+SOFTINCLUDE device.cds.lib                                                    

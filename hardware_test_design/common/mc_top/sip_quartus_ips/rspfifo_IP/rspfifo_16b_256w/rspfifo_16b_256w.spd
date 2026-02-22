@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file
+   path="fifo_1940/sim/rspfifo_16b_256w_fifo_1940_xxldnmi.v"
+   type="VERILOG"
+   library="fifo_1940" />
+ <file
+   path="fifo_1940/sim/rspfifo_16b_256w_fifo_1940_xxldnmi.sdc"
+   type="SDC_ENTITY"
+   library="fifo_1940" />
+ <file
+   path="sim/rspfifo_16b_256w.v"
+   type="VERILOG"
+   library="rspfifo_16b_256w"
+   hasInlineConfiguration="true" />
+ <topLevel name="rspfifo_16b_256w.rspfifo_16b_256w" />
+ <deviceFamily name="agilex7" />
+ <device name="AGIB023R18A1E1V" />
+</simPackage>

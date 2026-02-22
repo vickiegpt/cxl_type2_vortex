@@ -1,0 +1,5 @@
+
+DEFINE                     work             ./../libraries/work/            
+DEFINE                     ccl_csb2wire_csr ./../libraries/ccl_csb2wire_csr/
+INCLUDE simulator.cds.lib                                                   
+SOFTINCLUDE device.cds.lib                                                  

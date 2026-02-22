@@ -1,0 +1,5 @@
+
+DEFINE                     work             ./../libraries/work/            
+DEFINE                     hip_recfg_rst_in ./../libraries/hip_recfg_rst_in/
+INCLUDE simulator.cds.lib                                                   
+SOFTINCLUDE device.cds.lib                                                  

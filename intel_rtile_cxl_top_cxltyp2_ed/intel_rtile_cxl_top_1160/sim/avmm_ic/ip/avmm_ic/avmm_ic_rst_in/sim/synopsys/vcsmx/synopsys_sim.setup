@@ -1,0 +1,6 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/          
+work:                             ./libraries/work/          
+avmm_ic_rst_in:                   ./libraries/avmm_ic_rst_in/
+OTHERS=_device_synopsys_sim.setup                            

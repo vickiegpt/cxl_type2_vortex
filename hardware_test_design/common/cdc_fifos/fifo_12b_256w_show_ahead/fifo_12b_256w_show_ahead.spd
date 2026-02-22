@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file
+   path="fifo_1940/sim/fifo_12b_256w_show_ahead_fifo_1940_os5vrmy.v"
+   type="VERILOG"
+   library="fifo_1940" />
+ <file
+   path="sim/fifo_12b_256w_show_ahead.v"
+   type="VERILOG"
+   library="fifo_12b_256w_show_ahead"
+   hasInlineConfiguration="true" />
+ <topLevel name="fifo_12b_256w_show_ahead.fifo_12b_256w_show_ahead" />
+ <deviceFamily name="agilex7" />
+ <device name="AGIB023R18A1E1V" />
+</simPackage>

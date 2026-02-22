@@ -1,0 +1,5 @@
+
+DEFINE                     work           ./../libraries/work/          
+DEFINE                     avmm_ic_rst_in ./../libraries/avmm_ic_rst_in/
+INCLUDE simulator.cds.lib                                               
+SOFTINCLUDE device.cds.lib                                              

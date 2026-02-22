@@ -1,0 +1,7 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/                   
+work:                             ./libraries/work/                   
+fifo_1940:                        ./libraries/fifo_1940/              
+cfg_to_iosf_fifo_vcd_ED:          ./libraries/cfg_to_iosf_fifo_vcd_ED/
+OTHERS=_device_synopsys_sim.setup                                     

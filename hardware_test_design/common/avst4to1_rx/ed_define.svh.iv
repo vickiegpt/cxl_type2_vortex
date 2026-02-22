@@ -1,0 +1,58 @@
+// (C) 2001-2025 Altera Corporation. All rights reserved.
+// Your use of Altera Corporation's design tools, logic functions and other 
+// software and tools, and its AMPP partner logic functions, and any output 
+// files from any of the foregoing (including device programming or simulation 
+// files), and any associated documentation or information are expressly subject 
+// to the terms and conditions of the Altera Program License Subscription 
+// Agreement, Altera IP License Agreement, or other applicable 
+// license agreement, including, without limitation, that your use is for the 
+// sole purpose of programming logic devices manufactured by Altera and sold by 
+// Altera or its authorized distributors.  Please refer to the applicable 
+// agreement for further details.
+
+
+//------------------------------------------------------------
+// Copyright 2023 Intel Corporation.
+//
+// THIS SOFTWARE MAY CONTAIN PREPRODUCTION CODE AND IS PROVIDED BY THE
+// COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+// WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+// BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+// OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+// EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+//------------------------------------------------------------
+//-------------------------------------------------------------------------
+//  Global Defines
+// ------------------------------------------------------------------------
+//
+
+`ifndef ED_DEFINE
+`define ED_DEFINE
+
+
+package ed_define;
+
+
+
+    //# HDL Defines
+    //# =====================
+
+    // `define RNR
+    // `define CXL
+    // `define CXL_ED_SIM
+
+
+
+endpackage
+`endif// `define ED_DEFINE
+
+`ifdef QUESTA_INTEL_OEM
+`pragma questa_oem_00 "Gd3PNp/iCETomoI9T1qvTChS8QuNFJZzO4eBvfSMqCLVG9p14eDumXsFafak07C6pZJXw+Wpp/gh95jJ0LIau2GKkOPLYCo56vyEKZm8PMuLWqK8GLNgCekxjiDj3dWEnN5Kk4zUngtPFDNjwRwtq9nKCpPC8njXPwAdyW5/vB4oVDjMG6pTmfsd//bEscm1c/XG+qembdsS7rDUD4s6PD5MWe/og3Q7wWr8EVl6O4nO12smzfpMkr5ESm6nc48TlTzW0rye1/k6GdrjfuP/+Zvp60WvyjnOPKWyAwYlOFAawFlfIfENzZhnWtI5Z/FL53vKrdlgNVt5hQquMePLxwJcDzzb/wPvC/QKh47unDIZJeEE/LxagP3FTMMne27K161VWYCOXG152uEzLRiPmxbI8kMGpNXXaS1i4KHjG//v9LWrj5K04ZXlDyjXc2I34aVMUDJgJ8dEtC8AqF8Mq0a0inpRzv5ZsK15JA6f74vN/hwWZShY5TBOAbhtKtpk7aC2/8LO8A3GMIV3K38sGGDQRh37kNektJFPLYWJGLu+e+na/yga59NdvG0V0BDLm1nPlt+t54MlEgSX6WPD+4vcYEtO0DPtnNyhDG3fW0drvJkshPEyEIQGFPuh5V7NehFzGLFCCdtt0zsSOfdpZBX/w4m3FbpqB58R+IMKuH2DtAh1RTnXdcU33lh3eobNe1Yr5kXkijJjEiou9GNjIZhfi6gWfa7EXb90JXEMx4TysClXXQD4XKOxE70T7Unbrk9gOTT8nDihpHA8DqYBqAASilWKbHkA295+gfKiAVOk0wuP2VNn54YJZWeUGNTEjboM7cAmoSv25CXsZoSU8k3XIu3ww5Ise4cbh0B/YjfuvL6d314YxtBnC3bh6hAQh3TEEOgsOiM5rXyj+HZJjZbyaC1iiGkyGl97ndcqz97ZRDcJrQyD561JNtA9Stdw13YQO0vK531i+bKGibpnSOE+ejARhpymCs0vkyw1JXYdNl0CPdg/0goYvwB9e+J1"
+`endif

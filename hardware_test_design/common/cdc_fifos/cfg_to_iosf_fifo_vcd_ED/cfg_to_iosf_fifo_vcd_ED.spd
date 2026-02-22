@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file
+   path="fifo_1940/sim/cfg_to_iosf_fifo_vcd_ED_fifo_1940_sy3r3pi.v"
+   type="VERILOG"
+   library="fifo_1940" />
+ <file
+   path="fifo_1940/sim/cfg_to_iosf_fifo_vcd_ED_fifo_1940_sy3r3pi.sdc"
+   type="SDC_ENTITY"
+   library="fifo_1940" />
+ <file
+   path="sim/cfg_to_iosf_fifo_vcd_ED.v"
+   type="VERILOG"
+   library="cfg_to_iosf_fifo_vcd_ED"
+   hasInlineConfiguration="true" />
+ <topLevel name="cfg_to_iosf_fifo_vcd_ED.cfg_to_iosf_fifo_vcd_ED" />
+ <deviceFamily name="agilex7" />
+ <device name="AGIB023R18A1E1V" />
+</simPackage>

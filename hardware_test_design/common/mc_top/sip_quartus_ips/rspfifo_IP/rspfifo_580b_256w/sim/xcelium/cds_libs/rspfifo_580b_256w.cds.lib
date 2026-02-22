@@ -1,0 +1,5 @@
+
+DEFINE                     work              ./../libraries/work/             
+DEFINE                     rspfifo_580b_256w ./../libraries/rspfifo_580b_256w/
+INCLUDE simulator.cds.lib                                                     
+SOFTINCLUDE device.cds.lib                                                    

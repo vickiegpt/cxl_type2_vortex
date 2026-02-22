@@ -1,0 +1,5 @@
+
+DEFINE                     work              ./../libraries/work/             
+DEFINE                     altera_iopll_2000 ./../libraries/altera_iopll_2000/
+INCLUDE simulator.cds.lib                                                     
+SOFTINCLUDE device.cds.lib                                                    

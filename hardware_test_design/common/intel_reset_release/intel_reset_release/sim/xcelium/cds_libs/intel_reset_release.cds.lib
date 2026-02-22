@@ -1,0 +1,5 @@
+
+DEFINE                     work                ./../libraries/work/               
+DEFINE                     intel_reset_release ./../libraries/intel_reset_release/
+INCLUDE simulator.cds.lib                                                         
+SOFTINCLUDE device.cds.lib                                                        

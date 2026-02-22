@@ -1,0 +1,5 @@
+
+DEFINE                     work       ./../libraries/work/      
+DEFINE                     ccl_master ./../libraries/ccl_master/
+INCLUDE simulator.cds.lib                                       
+SOFTINCLUDE device.cds.lib                                      

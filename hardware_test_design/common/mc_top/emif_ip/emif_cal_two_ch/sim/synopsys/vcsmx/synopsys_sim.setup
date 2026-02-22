@@ -1,0 +1,8 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/                     
+work:                             ./libraries/work/                     
+altera_emif_cal_iossm_277:        ./libraries/altera_emif_cal_iossm_277/
+altera_emif_cal_277:              ./libraries/altera_emif_cal_277/      
+emif_cal_two_ch:                  ./libraries/emif_cal_two_ch/          
+OTHERS=_device_synopsys_sim.setup                                       

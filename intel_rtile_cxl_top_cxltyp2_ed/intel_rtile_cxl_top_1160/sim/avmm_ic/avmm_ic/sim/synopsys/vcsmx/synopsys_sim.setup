@@ -1,0 +1,21 @@
+
+WORK > DEFAULT
+DEFAULT:                              ./libraries/work/                                
+work:                                 ./libraries/work/                                
+altera_merlin_master_translator_193:  ./libraries/altera_merlin_master_translator_193/ 
+altera_merlin_slave_translator_191:   ./libraries/altera_merlin_slave_translator_191/  
+altera_merlin_master_agent_1931:      ./libraries/altera_merlin_master_agent_1931/     
+altera_merlin_slave_agent_1930:       ./libraries/altera_merlin_slave_agent_1930/      
+altera_avalon_sc_fifo_1932:           ./libraries/altera_avalon_sc_fifo_1932/          
+altera_merlin_router_1921:            ./libraries/altera_merlin_router_1921/           
+altera_merlin_traffic_limiter_1921:   ./libraries/altera_merlin_traffic_limiter_1921/  
+altera_avalon_st_pipeline_stage_1930: ./libraries/altera_avalon_st_pipeline_stage_1930/
+altera_merlin_burst_adapter_1940:     ./libraries/altera_merlin_burst_adapter_1940/    
+altera_merlin_demultiplexer_1921:     ./libraries/altera_merlin_demultiplexer_1921/    
+altera_merlin_multiplexer_1922:       ./libraries/altera_merlin_multiplexer_1922/      
+altera_merlin_width_adapter_1950:     ./libraries/altera_merlin_width_adapter_1950/    
+altera_mm_interconnect_1920:          ./libraries/altera_mm_interconnect_1920/         
+avmm_ic:                              ./libraries/avmm_ic/                             
+OTHERS=_device_synopsys_sim.setup                                                      
+OTHERS=_default_synopsys_sim.setup                                                     
+LIBRARY_SCAN = TRUE

@@ -1,0 +1,5 @@
+
+DEFINE                     work            ./../libraries/work/           
+DEFINE                     emif_cal_two_ch ./../libraries/emif_cal_two_ch/
+INCLUDE simulator.cds.lib                                                 
+SOFTINCLUDE device.cds.lib                                                

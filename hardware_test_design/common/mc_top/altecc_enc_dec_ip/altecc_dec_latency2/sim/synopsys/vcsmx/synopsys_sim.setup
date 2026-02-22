@@ -1,0 +1,7 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/               
+work:                             ./libraries/work/               
+altecc_1917:                      ./libraries/altecc_1917/        
+altecc_dec_latency2:              ./libraries/altecc_dec_latency2/
+OTHERS=_device_synopsys_sim.setup                                 

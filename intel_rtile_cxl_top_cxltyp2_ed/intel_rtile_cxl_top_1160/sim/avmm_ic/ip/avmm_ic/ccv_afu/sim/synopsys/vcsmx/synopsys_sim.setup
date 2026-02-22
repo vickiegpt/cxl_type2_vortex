@@ -1,0 +1,7 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/                        
+work:                             ./libraries/work/                        
+altera_avalon_mm_bridge_2010:     ./libraries/altera_avalon_mm_bridge_2010/
+ccv_afu:                          ./libraries/ccv_afu/                     
+OTHERS=_device_synopsys_sim.setup                                          

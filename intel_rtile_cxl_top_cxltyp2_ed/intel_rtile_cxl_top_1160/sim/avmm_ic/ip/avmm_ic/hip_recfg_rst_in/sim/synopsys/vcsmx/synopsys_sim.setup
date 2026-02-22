@@ -1,0 +1,6 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/            
+work:                             ./libraries/work/            
+hip_recfg_rst_in:                 ./libraries/hip_recfg_rst_in/
+OTHERS=_device_synopsys_sim.setup                              

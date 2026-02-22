@@ -1,0 +1,5 @@
+
+DEFINE                     work                         ./../libraries/work/                        
+DEFINE                     altera_avalon_mm_bridge_2010 ./../libraries/altera_avalon_mm_bridge_2010/
+INCLUDE simulator.cds.lib                                                                           
+SOFTINCLUDE device.cds.lib                                                                          

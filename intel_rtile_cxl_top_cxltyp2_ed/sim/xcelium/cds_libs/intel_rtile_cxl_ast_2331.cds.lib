@@ -1,0 +1,5 @@
+
+DEFINE                     work                     ./../libraries/work/                    
+DEFINE                     intel_rtile_cxl_ast_2331 ./../libraries/intel_rtile_cxl_ast_2331/
+INCLUDE simulator.cds.lib                                                                   
+SOFTINCLUDE device.cds.lib                                                                  

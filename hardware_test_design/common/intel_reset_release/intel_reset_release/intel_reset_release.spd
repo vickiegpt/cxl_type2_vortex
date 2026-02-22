@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file
+   path="altera_s10_user_rst_clkgate_1948/sim/altera_s10_user_rst_clkgate.sv"
+   type="SYSTEM_VERILOG"
+   library="altera_s10_user_rst_clkgate_1948" />
+ <file
+   path="sim/intel_reset_release.v"
+   type="VERILOG"
+   library="intel_reset_release"
+   hasInlineConfiguration="true" />
+ <topLevel name="intel_reset_release.intel_reset_release" />
+ <deviceFamily name="agilex7" />
+ <device name="AGIB023R18A1E1V" />
+</simPackage>

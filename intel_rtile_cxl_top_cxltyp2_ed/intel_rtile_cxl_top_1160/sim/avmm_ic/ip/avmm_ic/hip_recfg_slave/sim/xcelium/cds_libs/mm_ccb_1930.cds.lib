@@ -1,0 +1,5 @@
+
+DEFINE                     work        ./../libraries/work/       
+DEFINE                     mm_ccb_1930 ./../libraries/mm_ccb_1930/
+INCLUDE simulator.cds.lib                                         
+SOFTINCLUDE device.cds.lib                                        

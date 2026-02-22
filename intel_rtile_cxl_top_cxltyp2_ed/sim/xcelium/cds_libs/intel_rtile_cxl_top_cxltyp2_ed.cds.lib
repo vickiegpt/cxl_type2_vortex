@@ -1,0 +1,5 @@
+
+DEFINE                     work                           ./../libraries/work/                          
+DEFINE                     intel_rtile_cxl_top_cxltyp2_ed ./../libraries/intel_rtile_cxl_top_cxltyp2_ed/
+INCLUDE simulator.cds.lib                                                                               
+SOFTINCLUDE device.cds.lib                                                                              

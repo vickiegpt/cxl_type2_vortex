@@ -1,0 +1,5 @@
+
+DEFINE                     work                             ./../libraries/work/                            
+DEFINE                     altera_s10_user_rst_clkgate_1948 ./../libraries/altera_s10_user_rst_clkgate_1948/
+INCLUDE simulator.cds.lib                                                                                   
+SOFTINCLUDE device.cds.lib                                                                                  

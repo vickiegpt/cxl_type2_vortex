@@ -1,0 +1,19 @@
+# system info reqfifo on 2025.09.15.12:31:44
+system_info:
+name,value
+DEVICE,AGIB023R18A1E1V
+DEVICE_FAMILY,Agilex 7
+GENERATION_ID,0
+#
+#
+# Files generated for reqfifo on 2025.09.15.12:31:44
+files:
+filepath,kind,attributes,module,is_top
+sim/reqfifo.v,VERILOG,CONTAINS_INLINE_CONFIGURATION,reqfifo,true
+fifo_1940/sim/reqfifo_fifo_1940_rqad7fa.v,VERILOG,,reqfifo_fifo_1940_rqad7fa,false
+fifo_1940/sim/reqfifo_fifo_1940_rqad7fa.sdc,SDC_ENTITY,NO_AUTO_INSTANCE_DISCOVERY NO_SDC_PROMOTION,reqfifo_fifo_1940_rqad7fa,false
+#
+# Map from instance-path to kind of module
+instances:
+instancePath,module
+reqfifo.fifo_0,reqfifo_fifo_1940_rqad7fa

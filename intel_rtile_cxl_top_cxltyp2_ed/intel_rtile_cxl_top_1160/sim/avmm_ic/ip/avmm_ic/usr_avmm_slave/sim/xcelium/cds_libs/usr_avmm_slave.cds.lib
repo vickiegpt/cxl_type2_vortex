@@ -1,0 +1,5 @@
+
+DEFINE                     work           ./../libraries/work/          
+DEFINE                     usr_avmm_slave ./../libraries/usr_avmm_slave/
+INCLUDE simulator.cds.lib                                               
+SOFTINCLUDE device.cds.lib                                              

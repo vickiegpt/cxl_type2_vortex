@@ -1,0 +1,19 @@
+# system info iosf_to_cfg_fifo_vcd_ED on 2025.09.15.12:30:50
+system_info:
+name,value
+DEVICE,AGIB023R18A1E1V
+DEVICE_FAMILY,Agilex 7
+GENERATION_ID,0
+#
+#
+# Files generated for iosf_to_cfg_fifo_vcd_ED on 2025.09.15.12:30:50
+files:
+filepath,kind,attributes,module,is_top
+sim/iosf_to_cfg_fifo_vcd_ED.v,VERILOG,CONTAINS_INLINE_CONFIGURATION,iosf_to_cfg_fifo_vcd_ED,true
+fifo_1940/sim/iosf_to_cfg_fifo_vcd_ED_fifo_1940_jfkjnfa.v,VERILOG,,iosf_to_cfg_fifo_vcd_ED_fifo_1940_jfkjnfa,false
+fifo_1940/sim/iosf_to_cfg_fifo_vcd_ED_fifo_1940_jfkjnfa.sdc,SDC_ENTITY,NO_AUTO_INSTANCE_DISCOVERY NO_SDC_PROMOTION,iosf_to_cfg_fifo_vcd_ED_fifo_1940_jfkjnfa,false
+#
+# Map from instance-path to kind of module
+instances:
+instancePath,module
+iosf_to_cfg_fifo_vcd_ED.fifo_0,iosf_to_cfg_fifo_vcd_ED_fifo_1940_jfkjnfa

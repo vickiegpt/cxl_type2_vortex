@@ -1,0 +1,5 @@
+
+DEFINE                     work         ./../libraries/work/        
+DEFINE                     debug_master ./../libraries/debug_master/
+INCLUDE simulator.cds.lib                                           
+SOFTINCLUDE device.cds.lib                                          

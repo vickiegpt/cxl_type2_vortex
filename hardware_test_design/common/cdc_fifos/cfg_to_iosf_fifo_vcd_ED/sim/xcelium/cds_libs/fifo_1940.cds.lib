@@ -1,0 +1,5 @@
+
+DEFINE                     work      ./../libraries/work/     
+DEFINE                     fifo_1940 ./../libraries/fifo_1940/
+INCLUDE simulator.cds.lib                                     
+SOFTINCLUDE device.cds.lib                                    

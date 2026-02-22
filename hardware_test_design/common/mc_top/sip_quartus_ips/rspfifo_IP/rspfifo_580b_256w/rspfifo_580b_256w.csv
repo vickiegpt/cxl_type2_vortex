@@ -1,0 +1,19 @@
+# system info rspfifo_580b_256w on 2025.09.15.12:31:58
+system_info:
+name,value
+DEVICE,AGIB023R18A1E1V
+DEVICE_FAMILY,Agilex 7
+GENERATION_ID,0
+#
+#
+# Files generated for rspfifo_580b_256w on 2025.09.15.12:31:58
+files:
+filepath,kind,attributes,module,is_top
+sim/rspfifo_580b_256w.v,VERILOG,CONTAINS_INLINE_CONFIGURATION,rspfifo_580b_256w,true
+fifo_1940/sim/rspfifo_580b_256w_fifo_1940_7hz7moa.v,VERILOG,,rspfifo_580b_256w_fifo_1940_7hz7moa,false
+fifo_1940/sim/rspfifo_580b_256w_fifo_1940_7hz7moa.sdc,SDC_ENTITY,NO_AUTO_INSTANCE_DISCOVERY NO_SDC_PROMOTION,rspfifo_580b_256w_fifo_1940_7hz7moa,false
+#
+# Map from instance-path to kind of module
+instances:
+instancePath,module
+rspfifo_580b_256w.fifo_0,rspfifo_580b_256w_fifo_1940_7hz7moa

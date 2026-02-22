@@ -1,0 +1,9 @@
+dni
+output_files
+tmp-clearbox
+*.zip
+build
+.claude
+tests
+support_logic
+qdb

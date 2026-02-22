@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file
+   path="altecc_1917/sim/altecc_dec_latency1_altecc_1917_qolpqra.v"
+   type="VERILOG"
+   library="altecc_1917" />
+ <file
+   path="sim/altecc_dec_latency1.v"
+   type="VERILOG"
+   library="altecc_dec_latency1"
+   hasInlineConfiguration="true" />
+ <topLevel name="altecc_dec_latency1.altecc_dec_latency1" />
+ <deviceFamily name="agilex7" />
+ <device name="AGIB023R18A1E1V" />
+</simPackage>

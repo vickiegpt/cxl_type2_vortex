@@ -1,0 +1,6 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/      
+work:                             ./libraries/work/      
+ccl_ic_clk:                       ./libraries/ccl_ic_clk/
+OTHERS=_device_synopsys_sim.setup                        

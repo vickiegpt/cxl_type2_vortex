@@ -1,0 +1,8 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/                   
+work:                             ./libraries/work/                   
+altera_emif_arch_fm_191:          ./libraries/altera_emif_arch_fm_191/
+altera_emif_fm_277:               ./libraries/altera_emif_fm_277/     
+emif:                             ./libraries/emif/                   
+OTHERS=_device_synopsys_sim.setup                                     

@@ -1,0 +1,5 @@
+
+DEFINE                     work                ./../libraries/work/               
+DEFINE                     altecc_enc_latency0 ./../libraries/altecc_enc_latency0/
+INCLUDE simulator.cds.lib                                                         
+SOFTINCLUDE device.cds.lib                                                        

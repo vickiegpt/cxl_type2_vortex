@@ -1,0 +1,8 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/           
+work:                             ./libraries/work/           
+st_dc_fifo_1953:                  ./libraries/st_dc_fifo_1953/
+mm_ccb_1930:                      ./libraries/mm_ccb_1930/    
+hip_recfg_slave:                  ./libraries/hip_recfg_slave/
+OTHERS=_device_synopsys_sim.setup                             

@@ -1,0 +1,5 @@
+
+DEFINE                     work      ./../libraries/work/     
+DEFINE                     afu_slave ./../libraries/afu_slave/
+INCLUDE simulator.cds.lib                                     
+SOFTINCLUDE device.cds.lib                                    

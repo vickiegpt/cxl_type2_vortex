@@ -1,0 +1,10 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/                          
+work:                             ./libraries/work/                          
+intel_rtile_cxl_ast_2331:         ./libraries/intel_rtile_cxl_ast_2331/      
+intel_rtile_cxl_top_1160:         ./libraries/intel_rtile_cxl_top_1160/      
+altera_iopll_2000:                ./libraries/altera_iopll_2000/             
+fifo_1940:                        ./libraries/fifo_1940/                     
+intel_rtile_cxl_top_cxltyp2_ed:   ./libraries/intel_rtile_cxl_top_cxltyp2_ed/
+OTHERS=_device_synopsys_sim.setup                                            

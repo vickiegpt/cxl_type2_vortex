@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file
+   path="altera_emif_cal_iossm_277/sim/altera_emif_cal_iossm.sv"
+   type="SYSTEM_VERILOG"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_iossm_277/sim/altera_emif_f2c_gearbox.sv"
+   type="SYSTEM_VERILOG"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_iossm_277/sim/emif_cal_two_ch_altera_emif_cal_iossm_277_udi6bxq_code.hex"
+   type="HEX"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_iossm_277/sim/emif_cal_two_ch_altera_emif_cal_iossm_277_udi6bxq_sim_global_param_tbl.hex"
+   type="HEX"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_iossm_277/sim/emif_cal_two_ch_altera_emif_cal_iossm_277_udi6bxq_sim_global_param_tbl.txt"
+   type="OTHER"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_iossm_277/sim/emif_cal_two_ch_altera_emif_cal_iossm_277_udi6bxq_synth_global_param_tbl.hex"
+   type="HEX"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_iossm_277/sim/emif_cal_two_ch_altera_emif_cal_iossm_277_udi6bxq_synth_global_param_tbl.txt"
+   type="OTHER"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_iossm_277/sim/emif_cal_two_ch_altera_emif_cal_iossm_277_udi6bxq_arch.sv"
+   type="SYSTEM_VERILOG"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_iossm_277/sim/emif_cal_two_ch_altera_emif_cal_iossm_277_udi6bxq.sv"
+   type="SYSTEM_VERILOG"
+   library="altera_emif_cal_iossm_277" />
+ <file
+   path="altera_emif_cal_277/sim/emif_cal_two_ch_altera_emif_cal_277_w4se6ky.v"
+   type="VERILOG"
+   library="altera_emif_cal_277"
+   hasInlineConfiguration="true" />
+ <file
+   path="sim/emif_cal_two_ch.v"
+   type="VERILOG"
+   library="emif_cal_two_ch"
+   hasInlineConfiguration="true" />
+ <topLevel name="emif_cal_two_ch.emif_cal_two_ch" />
+ <deviceFamily name="agilex7" />
+ <device name="AGIB023R18A1E1V" />
+</simPackage>

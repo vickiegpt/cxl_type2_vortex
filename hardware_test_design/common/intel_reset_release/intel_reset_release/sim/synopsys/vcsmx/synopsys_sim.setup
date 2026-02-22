@@ -1,0 +1,7 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/                            
+work:                             ./libraries/work/                            
+altera_s10_user_rst_clkgate_1948: ./libraries/altera_s10_user_rst_clkgate_1948/
+intel_reset_release:              ./libraries/intel_reset_release/             
+OTHERS=_device_synopsys_sim.setup                                              

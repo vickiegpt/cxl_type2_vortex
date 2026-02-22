@@ -1,0 +1,5 @@
+
+DEFINE                     work                    ./../libraries/work/                   
+DEFINE                     altera_emif_arch_fm_191 ./../libraries/altera_emif_arch_fm_191/
+INCLUDE simulator.cds.lib                                                                 
+SOFTINCLUDE device.cds.lib                                                                

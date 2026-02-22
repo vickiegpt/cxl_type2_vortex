@@ -1,0 +1,7 @@
+
+WORK > DEFAULT
+DEFAULT:                          ./libraries/work/            
+work:                             ./libraries/work/            
+fifo_1940:                        ./libraries/fifo_1940/       
+rspfifo_16b_256w:                 ./libraries/rspfifo_16b_256w/
+OTHERS=_device_synopsys_sim.setup                              
