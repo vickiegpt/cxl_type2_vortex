@@ -31,9 +31,12 @@
 
 
 
+`include "vortex/VX_define.vh"
+
 module afu_top
 
 import ddr_mc_top_common_pkg::*;
+import cxl_memuring_vortex_pkg::*;
 (
     
 `ifdef ENABLE_1_SLICE   
@@ -783,7 +786,7 @@ import ddr_mc_top_common_pkg::*;
  assign   mc2ip_1_sr_status      =  mc_status[1]                   ;
 
 
-//Channel-0
+//Channel-0 : Passthrough (Host HDM traffic)
  assign ip2hdm_aximm_awid    [0] = ip2hdm_aximm0_awid ;
  assign ip2hdm_aximm_awaddr  [0] = ip2hdm_aximm0_awaddr ;
  assign ip2hdm_aximm_awlen   [0] = ip2hdm_aximm0_awlen ;
@@ -814,7 +817,7 @@ import ddr_mc_top_common_pkg::*;
  assign ip2hdm_aximm_arcache [0] = ip2hdm_aximm0_arcache ;
  assign ip2hdm_aximm_arlock  [0] = ip2hdm_aximm0_arlock ;
  assign ip2hdm_aximm_arvalid [0] = ip2hdm_aximm0_arvalid;
- 
+
  assign hdm2ip_aximm0_awready    =  hdm2ip_aximm_awready[0] ;
  assign hdm2ip_aximm0_wready     =  hdm2ip_aximm_wready [0] ;
  assign hdm2ip_aximm0_bvalid     =  hdm2ip_aximm_bvalid [0] ;
@@ -832,53 +835,336 @@ import ddr_mc_top_common_pkg::*;
  assign ip2hdm_aximm_rready  [0] = ip2hdm_aximm0_rready ;
 `endif
 
-//Channel-1
- assign ip2hdm_aximm_awid    [1] = ip2hdm_aximm1_awid ;
- assign ip2hdm_aximm_awaddr  [1] = ip2hdm_aximm1_awaddr ;
- assign ip2hdm_aximm_awlen   [1] = ip2hdm_aximm1_awlen ;
- assign ip2hdm_aximm_awregion[1] = ip2hdm_aximm1_awregion ;
- assign ip2hdm_aximm_awuser  [1] = ip2hdm_aximm1_awuser ;
- assign ip2hdm_aximm_awsize  [1] = ip2hdm_aximm1_awsize  ;
- assign ip2hdm_aximm_awburst [1] = ip2hdm_aximm1_awburst ;
- assign ip2hdm_aximm_awprot  [1] = ip2hdm_aximm1_awprot  ;
- assign ip2hdm_aximm_awqos   [1] = ip2hdm_aximm1_awqos   ;
- assign ip2hdm_aximm_awcache [1] = ip2hdm_aximm1_awcache ;
- assign ip2hdm_aximm_awlock  [1] = ip2hdm_aximm1_awlock  ;
- assign ip2hdm_aximm_awvalid [1] = ip2hdm_aximm1_awvalid;
- assign ip2hdm_aximm_wdata   [1] = ip2hdm_aximm1_wdata ;
- assign ip2hdm_aximm_wstrb   [1] = ip2hdm_aximm1_wstrb ;
- assign ip2hdm_aximm_wlast   [1] = ip2hdm_aximm1_wlast ;
- assign ip2hdm_aximm_wuser   [1] = ip2hdm_aximm1_wuser ;
- assign ip2hdm_aximm_wvalid  [1] = ip2hdm_aximm1_wvalid;
- assign ip2hdm_aximm_bready  [1] = ip2hdm_aximm1_bready ;
- assign ip2hdm_aximm_arid    [1] = ip2hdm_aximm1_arid ;
- assign ip2hdm_aximm_araddr  [1] = ip2hdm_aximm1_araddr ;
- assign ip2hdm_aximm_arlen   [1] = ip2hdm_aximm1_arlen ;
- assign ip2hdm_aximm_arregion[1] = ip2hdm_aximm1_arregion ;
- assign ip2hdm_aximm_aruser  [1] = ip2hdm_aximm1_aruser ;
- assign ip2hdm_aximm_arsize  [1] = ip2hdm_aximm1_arsize ;
- assign ip2hdm_aximm_arburst [1] = ip2hdm_aximm1_arburst ;
- assign ip2hdm_aximm_arprot  [1] = ip2hdm_aximm1_arprot  ;
- assign ip2hdm_aximm_arqos   [1] = ip2hdm_aximm1_arqos  ;
- assign ip2hdm_aximm_arcache [1] = ip2hdm_aximm1_arcache ;
- assign ip2hdm_aximm_arlock  [1] = ip2hdm_aximm1_arlock ;
- assign ip2hdm_aximm_arvalid [1] = ip2hdm_aximm1_arvalid;
- 
- assign hdm2ip_aximm1_awready    =  hdm2ip_aximm_awready[1] ;
- assign hdm2ip_aximm1_wready     =  hdm2ip_aximm_wready [1] ;
- assign hdm2ip_aximm1_bvalid     =  hdm2ip_aximm_bvalid [1] ;
- assign hdm2ip_aximm1_bid        =  hdm2ip_aximm_bid    [1] ;
- assign hdm2ip_aximm1_buser      =  hdm2ip_aximm_buser  [1] ;
- assign hdm2ip_aximm1_bresp      =  hdm2ip_aximm_bresp  [1] ;
- assign hdm2ip_aximm1_arready    =  hdm2ip_aximm_arready[1] ;
- `ifndef DELAY_BUFFER_EN
- assign hdm2ip_aximm1_rvalid     =  hdm2ip_aximm_rvalid [1] ;
- assign hdm2ip_aximm1_rlast      =  hdm2ip_aximm_rlast  [1] ;
- assign hdm2ip_aximm1_rid        =  hdm2ip_aximm_rid    [1] ;
- assign hdm2ip_aximm1_rdata      =  hdm2ip_aximm_rdata  [1] ;
- assign hdm2ip_aximm1_ruser      =  hdm2ip_aximm_ruser  [1] ;
- assign hdm2ip_aximm1_rresp      =  hdm2ip_aximm_rresp  [1] ;
- assign ip2hdm_aximm_rready  [1] = ip2hdm_aximm1_rready ;
+//=========================================================================
+// Channel-1 : Intercepted by Vortex GPU Wrapper
+//
+// - CXL IP channel 1 AXI -> AXI-to-CSR bridge -> GPU wrapper CSR (host control)
+// - GPU wrapper Port1 -> MC channel 1 (GPU device memory access)
+// - GPU wrapper Port0 -> tied off (unused)
+//=========================================================================
+
+// GPU wrapper internal signals
+logic        gpu_csr_valid;
+logic        gpu_csr_write;
+logic [11:0] gpu_csr_addr;
+logic [63:0] gpu_csr_wdata;
+logic        gpu_csr_ready;
+logic [63:0] gpu_csr_rdata;
+
+logic        gpu_kernel_done;
+logic [31:0] gpu_kernel_status;
+
+vortex_perf_counters_t gpu_perf_counters;
+
+// Dummy kernel launch interface (not used - CSR-driven launch)
+vortex_kernel_args_t   dummy_kernel_args;
+assign dummy_kernel_args = '0;
+
+//=========================================================================
+// AXI-to-CSR Bridge: CXL IP channel 1 -> GPU wrapper CSR
+// Converts single-beat AXI write/read to CSR interface
+//=========================================================================
+
+typedef enum logic [2:0] {
+    AXI_CSR_IDLE,
+    AXI_CSR_WRITE_DATA,
+    AXI_CSR_WRITE_RESP,
+    AXI_CSR_READ_WAIT,
+    AXI_CSR_READ_RESP
+} axi_csr_state_t;
+
+axi_csr_state_t axi_csr_state;
+logic [7:0]  axi_csr_saved_id;
+logic [11:0] axi_csr_saved_addr;
+
+always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n) begin
+    if (!ip2hdm_reset_n) begin
+        axi_csr_state    <= AXI_CSR_IDLE;
+        gpu_csr_valid    <= 1'b0;
+        gpu_csr_write    <= 1'b0;
+        gpu_csr_addr     <= 12'h0;
+        gpu_csr_wdata    <= 64'h0;
+        axi_csr_saved_id <= 8'h0;
+        axi_csr_saved_addr <= 12'h0;
+        // AXI slave responses
+        hdm2ip_aximm1_awready <= 1'b0;
+        hdm2ip_aximm1_wready  <= 1'b0;
+        hdm2ip_aximm1_bvalid  <= 1'b0;
+        hdm2ip_aximm1_bid     <= 8'h0;
+        hdm2ip_aximm1_buser   <= 1'b0;
+        hdm2ip_aximm1_bresp   <= 2'b00;
+        hdm2ip_aximm1_arready <= 1'b0;
+        hdm2ip_aximm1_rvalid  <= 1'b0;
+        hdm2ip_aximm1_rlast   <= 1'b0;
+        hdm2ip_aximm1_rid     <= 8'h0;
+        hdm2ip_aximm1_rdata   <= 512'h0;
+        hdm2ip_aximm1_ruser   <= 1'b0;
+        hdm2ip_aximm1_rresp   <= 2'b00;
+    end else begin
+        // Default: deassert handshake signals
+        hdm2ip_aximm1_awready <= 1'b0;
+        hdm2ip_aximm1_wready  <= 1'b0;
+        hdm2ip_aximm1_arready <= 1'b0;
+        gpu_csr_valid         <= 1'b0;
+
+        case (axi_csr_state)
+            AXI_CSR_IDLE: begin
+                hdm2ip_aximm1_bvalid <= 1'b0;
+                hdm2ip_aximm1_rvalid <= 1'b0;
+
+                if (ip2hdm_aximm1_awvalid) begin
+                    // AXI Write Address phase
+                    hdm2ip_aximm1_awready <= 1'b1;
+                    axi_csr_saved_id   <= ip2hdm_aximm1_awid;
+                    axi_csr_saved_addr <= ip2hdm_aximm1_awaddr[11:0];
+                    axi_csr_state      <= AXI_CSR_WRITE_DATA;
+                end else if (ip2hdm_aximm1_arvalid) begin
+                    // AXI Read Address phase
+                    hdm2ip_aximm1_arready <= 1'b1;
+                    axi_csr_saved_id   <= ip2hdm_aximm1_arid;
+                    axi_csr_saved_addr <= ip2hdm_aximm1_araddr[11:0];
+                    // Issue CSR read
+                    gpu_csr_valid <= 1'b1;
+                    gpu_csr_write <= 1'b0;
+                    gpu_csr_addr  <= ip2hdm_aximm1_araddr[11:0];
+                    axi_csr_state <= AXI_CSR_READ_WAIT;
+                end
+            end
+
+            AXI_CSR_WRITE_DATA: begin
+                if (ip2hdm_aximm1_wvalid) begin
+                    hdm2ip_aximm1_wready <= 1'b1;
+                    // Issue CSR write
+                    gpu_csr_valid <= 1'b1;
+                    gpu_csr_write <= 1'b1;
+                    gpu_csr_addr  <= axi_csr_saved_addr;
+                    gpu_csr_wdata <= ip2hdm_aximm1_wdata[63:0];
+                    axi_csr_state <= AXI_CSR_WRITE_RESP;
+                end
+            end
+
+            AXI_CSR_WRITE_RESP: begin
+                if (gpu_csr_ready && !hdm2ip_aximm1_bvalid) begin
+                    // Assert B response, hold until bready handshake
+                    hdm2ip_aximm1_bvalid <= 1'b1;
+                    hdm2ip_aximm1_bid    <= axi_csr_saved_id;
+                    hdm2ip_aximm1_bresp  <= 2'b00;  // OKAY
+                    hdm2ip_aximm1_buser  <= 1'b0;
+                end
+                if (hdm2ip_aximm1_bvalid && ip2hdm_aximm1_bready) begin
+                    // B handshake complete
+                    hdm2ip_aximm1_bvalid <= 1'b0;
+                    axi_csr_state        <= AXI_CSR_IDLE;
+                end
+            end
+
+            AXI_CSR_READ_WAIT: begin
+                if (gpu_csr_ready) begin
+                    // Send read response
+                    hdm2ip_aximm1_rvalid <= 1'b1;
+                    hdm2ip_aximm1_rlast  <= 1'b1;
+                    hdm2ip_aximm1_rid    <= axi_csr_saved_id;
+                    hdm2ip_aximm1_rdata  <= {448'h0, gpu_csr_rdata};
+                    hdm2ip_aximm1_rresp  <= 2'b00;  // OKAY
+                    hdm2ip_aximm1_ruser  <= 1'b0;
+                    axi_csr_state        <= AXI_CSR_READ_RESP;
+                end
+            end
+
+            AXI_CSR_READ_RESP: begin
+                if (ip2hdm_aximm1_rready) begin
+                    hdm2ip_aximm1_rvalid <= 1'b0;
+                    axi_csr_state        <= AXI_CSR_IDLE;
+                end
+            end
+
+            default: axi_csr_state <= AXI_CSR_IDLE;
+        endcase
+    end
+end
+
+//=========================================================================
+// GPU Port1 intermediate wires (GPU wrapper outputs -> MC channel 1)
+//=========================================================================
+
+logic [3:0]   gpu_p1_awid;
+logic [63:0]  gpu_p1_awaddr;
+logic [7:0]   gpu_p1_awlen;
+logic [2:0]   gpu_p1_awsize;
+logic [1:0]   gpu_p1_awburst;
+logic         gpu_p1_awlock;
+logic [3:0]   gpu_p1_awcache;
+logic [2:0]   gpu_p1_awprot;
+logic         gpu_p1_awvalid;
+
+logic [511:0] gpu_p1_wdata;
+logic [63:0]  gpu_p1_wstrb;
+logic         gpu_p1_wlast;
+logic         gpu_p1_wvalid;
+
+logic         gpu_p1_bready;
+
+logic [3:0]   gpu_p1_arid;
+logic [63:0]  gpu_p1_araddr;
+logic [7:0]   gpu_p1_arlen;
+logic [2:0]   gpu_p1_arsize;
+logic [1:0]   gpu_p1_arburst;
+logic         gpu_p1_arlock;
+logic [3:0]   gpu_p1_arcache;
+logic [2:0]   gpu_p1_arprot;
+logic         gpu_p1_arvalid;
+
+logic         gpu_p1_rready;
+
+//=========================================================================
+// Vortex GPU Wrapper Instance
+//=========================================================================
+
+vortex_gpu_wrapper vortex_gpu_inst (
+    .clk                    (ip2hdm_clk),
+    .rst_n                  (ip2hdm_reset_n),
+
+    // CSR interface (from AXI-to-CSR bridge above)
+    .csr_valid              (gpu_csr_valid),
+    .csr_write              (gpu_csr_write),
+    .csr_addr               (gpu_csr_addr),
+    .csr_wdata              (gpu_csr_wdata),
+    .csr_ready              (gpu_csr_ready),
+    .csr_rdata              (gpu_csr_rdata),
+
+    // Kernel launch interface (unused - using CSR-driven launch)
+    .kernel_launch_valid    (1'b0),
+    .kernel_args            (dummy_kernel_args),
+    .kernel_launch_ready    (),
+    .kernel_done            (gpu_kernel_done),
+    .kernel_status          (gpu_kernel_status),
+
+    // Performance counters
+    .perf_counters          (gpu_perf_counters),
+
+    // AXI Port 0 (Host Memory) - unused, tied off inside wrapper
+    .m_axi_port0_awid       (),
+    .m_axi_port0_awaddr     (),
+    .m_axi_port0_awlen      (),
+    .m_axi_port0_awsize     (),
+    .m_axi_port0_awburst    (),
+    .m_axi_port0_awlock     (),
+    .m_axi_port0_awcache    (),
+    .m_axi_port0_awprot     (),
+    .m_axi_port0_awvalid    (),
+    .m_axi_port0_awready    (1'b1),
+    .m_axi_port0_wdata      (),
+    .m_axi_port0_wstrb      (),
+    .m_axi_port0_wlast      (),
+    .m_axi_port0_wvalid     (),
+    .m_axi_port0_wready     (1'b1),
+    .m_axi_port0_bid        (4'h0),
+    .m_axi_port0_bresp      (2'b00),
+    .m_axi_port0_bvalid     (1'b0),
+    .m_axi_port0_bready     (),
+    .m_axi_port0_arid       (),
+    .m_axi_port0_araddr     (),
+    .m_axi_port0_arlen      (),
+    .m_axi_port0_arsize     (),
+    .m_axi_port0_arburst    (),
+    .m_axi_port0_arlock     (),
+    .m_axi_port0_arcache    (),
+    .m_axi_port0_arprot     (),
+    .m_axi_port0_arvalid    (),
+    .m_axi_port0_arready    (1'b1),
+    .m_axi_port0_rid        (4'h0),
+    .m_axi_port0_rdata      (512'h0),
+    .m_axi_port0_rresp      (2'b00),
+    .m_axi_port0_rlast      (1'b0),
+    .m_axi_port0_rvalid     (1'b0),
+    .m_axi_port0_rready     (),
+
+    // AXI Port 1 (Device Memory) -> MC channel 1 via intermediate wires
+    .m_axi_port1_awid       (gpu_p1_awid),
+    .m_axi_port1_awaddr     (gpu_p1_awaddr),
+    .m_axi_port1_awlen      (gpu_p1_awlen),
+    .m_axi_port1_awsize     (gpu_p1_awsize),
+    .m_axi_port1_awburst    (gpu_p1_awburst),
+    .m_axi_port1_awlock     (gpu_p1_awlock),
+    .m_axi_port1_awcache    (gpu_p1_awcache),
+    .m_axi_port1_awprot     (gpu_p1_awprot),
+    .m_axi_port1_awvalid    (gpu_p1_awvalid),
+    .m_axi_port1_awready    (hdm2ip_aximm_awready[1]),
+    .m_axi_port1_wdata      (gpu_p1_wdata),
+    .m_axi_port1_wstrb      (gpu_p1_wstrb),
+    .m_axi_port1_wlast      (gpu_p1_wlast),
+    .m_axi_port1_wvalid     (gpu_p1_wvalid),
+    .m_axi_port1_wready     (hdm2ip_aximm_wready[1]),
+    .m_axi_port1_bid        (hdm2ip_aximm_bid[1][3:0]),
+    .m_axi_port1_bresp      (hdm2ip_aximm_bresp[1]),
+    .m_axi_port1_bvalid     (hdm2ip_aximm_bvalid[1]),
+    .m_axi_port1_bready     (gpu_p1_bready),
+    .m_axi_port1_arid       (gpu_p1_arid),
+    .m_axi_port1_araddr     (gpu_p1_araddr),
+    .m_axi_port1_arlen      (gpu_p1_arlen),
+    .m_axi_port1_arsize     (gpu_p1_arsize),
+    .m_axi_port1_arburst    (gpu_p1_arburst),
+    .m_axi_port1_arlock     (gpu_p1_arlock),
+    .m_axi_port1_arcache    (gpu_p1_arcache),
+    .m_axi_port1_arprot     (gpu_p1_arprot),
+    .m_axi_port1_arvalid    (gpu_p1_arvalid),
+    .m_axi_port1_arready    (hdm2ip_aximm_arready[1]),
+    .m_axi_port1_rid        (hdm2ip_aximm_rid[1][3:0]),
+    .m_axi_port1_rdata      (hdm2ip_aximm_rdata[1]),
+    .m_axi_port1_rresp      (hdm2ip_aximm_rresp[1]),
+    .m_axi_port1_rlast      (hdm2ip_aximm_rlast[1]),
+    .m_axi_port1_rvalid     (hdm2ip_aximm_rvalid[1]),
+    .m_axi_port1_rready     (gpu_p1_rready)
+);
+
+//=========================================================================
+// GPU Port1 -> MC Channel 1 signal assignments
+//=========================================================================
+
+// Write address channel (GPU -> MC)
+assign ip2hdm_aximm_awid    [1] = {4'h0, gpu_p1_awid};
+assign ip2hdm_aximm_awaddr  [1] = gpu_p1_awaddr[51:0];
+assign ip2hdm_aximm_awlen   [1] = {2'b00, gpu_p1_awlen};
+assign ip2hdm_aximm_awregion[1] = 4'h0;
+assign ip2hdm_aximm_awuser  [1] = 1'b1;   // target_hdm = 1 (device memory)
+assign ip2hdm_aximm_awsize  [1] = gpu_p1_awsize;
+assign ip2hdm_aximm_awburst [1] = gpu_p1_awburst;
+assign ip2hdm_aximm_awprot  [1] = gpu_p1_awprot;
+assign ip2hdm_aximm_awqos   [1] = 4'h0;
+assign ip2hdm_aximm_awcache [1] = gpu_p1_awcache;
+assign ip2hdm_aximm_awlock  [1] = {1'b0, gpu_p1_awlock};
+assign ip2hdm_aximm_awvalid [1] = gpu_p1_awvalid;
+
+// Write data channel (GPU -> MC)
+assign ip2hdm_aximm_wdata   [1] = gpu_p1_wdata;
+assign ip2hdm_aximm_wstrb   [1] = gpu_p1_wstrb;
+assign ip2hdm_aximm_wlast   [1] = gpu_p1_wlast;
+assign ip2hdm_aximm_wuser   [1] = 1'b0;
+assign ip2hdm_aximm_wvalid  [1] = gpu_p1_wvalid;
+
+// Write response channel (MC -> GPU)
+assign ip2hdm_aximm_bready  [1] = gpu_p1_bready;
+
+// Read address channel (GPU -> MC)
+assign ip2hdm_aximm_arid    [1] = {4'h0, gpu_p1_arid};
+assign ip2hdm_aximm_araddr  [1] = gpu_p1_araddr[51:0];
+assign ip2hdm_aximm_arlen   [1] = {2'b00, gpu_p1_arlen};
+assign ip2hdm_aximm_arregion[1] = 4'h0;
+assign ip2hdm_aximm_aruser  [1] = 1'b1;   // target_hdm = 1 (device memory)
+assign ip2hdm_aximm_arsize  [1] = gpu_p1_arsize;
+assign ip2hdm_aximm_arburst [1] = gpu_p1_arburst;
+assign ip2hdm_aximm_arprot  [1] = gpu_p1_arprot;
+assign ip2hdm_aximm_arqos   [1] = 4'h0;
+assign ip2hdm_aximm_arcache [1] = gpu_p1_arcache;
+assign ip2hdm_aximm_arlock  [1] = {1'b0, gpu_p1_arlock};
+assign ip2hdm_aximm_arvalid [1] = gpu_p1_arvalid;
+
+// Read response channel (MC -> GPU)
+assign ip2hdm_aximm_rready  [1] = gpu_p1_rready;
+
+`ifndef DELAY_BUFFER_EN
+// Channel 1 CXL IP responses are driven by AXI-to-CSR bridge FSM above
+// Channel 1 MC responses go directly to GPU wrapper via hdm2ip_aximm_*[1]
 `endif
 
 
@@ -898,27 +1184,21 @@ typedef struct packed {
   `elsif ENABLE_4_SLICE
     // TODO
   `else // 2_SLICE
-    axi_r_ch_t [1:0] r_ch_in, r_ch_out;
+    // Channel 0: delay buffer for host HDM traffic (CXL IP <-> MC)
+    axi_r_ch_t r_ch_in_0, r_ch_out_0;
 
-generate for (genvar i = 0; i < 2; i = i + 1)
-  begin
-    assign r_ch_in[i].rlast = hdm2ip_aximm_rlast[i];
-    assign r_ch_in[i].rid   = hdm2ip_aximm_rid[i];
-    assign r_ch_in[i].rdata = hdm2ip_aximm_rdata[i];
-    assign r_ch_in[i].ruser = hdm2ip_aximm_ruser[i];
-    assign r_ch_in[i].rresp = hdm2ip_aximm_rresp[i];
-  end
-endgenerate
-    assign hdm2ip_aximm0_rlast = r_ch_out[0].rlast;
-    assign hdm2ip_aximm0_rid   = r_ch_out[0].rid;
-    assign hdm2ip_aximm0_rdata = r_ch_out[0].rdata;
-    assign hdm2ip_aximm0_ruser = r_ch_out[0].ruser;
-    assign hdm2ip_aximm0_rresp = r_ch_out[0].rresp;
-    assign hdm2ip_aximm1_rlast = r_ch_out[1].rlast;
-    assign hdm2ip_aximm1_rid   = r_ch_out[1].rid;
-    assign hdm2ip_aximm1_rdata = r_ch_out[1].rdata;
-    assign hdm2ip_aximm1_ruser = r_ch_out[1].ruser;
-    assign hdm2ip_aximm1_rresp = r_ch_out[1].rresp;
+    assign r_ch_in_0.rlast = hdm2ip_aximm_rlast[0];
+    assign r_ch_in_0.rid   = hdm2ip_aximm_rid[0];
+    assign r_ch_in_0.rdata = hdm2ip_aximm_rdata[0];
+    assign r_ch_in_0.ruser = hdm2ip_aximm_ruser[0];
+    assign r_ch_in_0.rresp = hdm2ip_aximm_rresp[0];
+
+    assign hdm2ip_aximm0_rlast = r_ch_out_0.rlast;
+    assign hdm2ip_aximm0_rid   = r_ch_out_0.rid;
+    assign hdm2ip_aximm0_rdata = r_ch_out_0.rdata;
+    assign hdm2ip_aximm0_ruser = r_ch_out_0.ruser;
+    assign hdm2ip_aximm0_rresp = r_ch_out_0.rresp;
+
     axi_r db_0 (
       .clock (ip2hdm_clk),
       .reset (~ip2hdm_reset_n),
@@ -926,28 +1206,17 @@ endgenerate
       .io_read_delay      (read_delay),
 
       .io_axi_r_in_valid  (hdm2ip_aximm_rvalid[0]),
-      .io_axi_r_in_bits   (r_ch_in[0]),
+      .io_axi_r_in_bits   (r_ch_in_0),
       .io_axi_r_in_ready  (ip2hdm_aximm_rready[0]),
 
       .io_axi_r_out_valid (hdm2ip_aximm0_rvalid),
-      .io_axi_r_out_bits  (r_ch_out[0]),
+      .io_axi_r_out_bits  (r_ch_out_0),
       .io_axi_r_out_ready (ip2hdm_aximm0_rready)
       );
 
-    axi_r db_1 (
-      .clock (ip2hdm_clk),
-      .reset (~ip2hdm_reset_n),
-
-      .io_read_delay      (read_delay),
-
-      .io_axi_r_in_valid  (hdm2ip_aximm_rvalid[1]),
-      .io_axi_r_in_bits   (r_ch_in[1]),
-      .io_axi_r_in_ready  (ip2hdm_aximm_rready[1]),
-
-      .io_axi_r_out_valid (hdm2ip_aximm1_rvalid),
-      .io_axi_r_out_bits  (r_ch_out[1]),
-      .io_axi_r_out_ready (ip2hdm_aximm1_rready)
-      );
+    // Channel 1: No delay buffer - GPU wrapper owns this channel
+    // MC read responses go directly to GPU wrapper via hdm2ip_aximm_*[1]
+    // CXL IP ch1 read responses are driven by AXI-to-CSR bridge FSM
   `endif
 `endif // DELAY_BUFFER_EN
 

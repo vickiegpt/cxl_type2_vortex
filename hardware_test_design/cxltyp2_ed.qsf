@@ -57,6 +57,9 @@ source ./constraints/ia780i_pinout.tcl
 #set_global_assignment -name QSYS_FILE ../../AGIB023R18A1E1V/pcie/sigtap_512.ip
 #set_global_assignment -name VERILOG_MACRO IA780I
 #set_global_assignment -name VERILOG_MACRO DELAY_BUFFER_EN
+# Vortex GPU synthesis macros: select DSP FPU mode + Quartus BRAM/latency optimizations
+set_global_assignment -name VERILOG_MACRO "SYNTHESIS"
+set_global_assignment -name VERILOG_MACRO "QUARTUS"
 #set_global_assignment -name SYSTEMVERILOG_FILE ../../axi_delay/axi_r.sv
 ## 
 source ./constraints/cxltyp2_quartus_constraints_ed_en.tcl
@@ -234,11 +237,235 @@ set_global_assignment -name SEARCH_PATH ./common/
 set_global_assignment -name SEARCH_PATH ./common/avst4to1_rx/
 set_global_assignment -name SEARCH_PATH ./common/axi_to_avst/
 set_global_assignment -name SEARCH_PATH ./common/cafu_csr0/
+set_global_assignment -name SEARCH_PATH ./common/rv64/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/cache/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/core/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/fpu/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/libs/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/mem/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/interfaces/
+# TCU disabled - EXT_TCU_ENABLE not defined, HardFloat dependency missing
+# set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/tcu/
+# set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/tcu/bhf/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/afu/opae/
+set_global_assignment -name SEARCH_PATH ./common/rv64/vortex/afu/xrt/
 set_global_assignment -name SEARCH_PATH ./../intel_rtile_cxl_top_cxltyp2_ed
 set_global_assignment -name SEARCH_PATH ./../intel_rtile_cxl_top_cxltyp2_ed/intel_rtile_cxl_top_1160/synth
 
 # CXL IP - include the QIP file which has all the dependencies
 set_global_assignment -name QIP_FILE ./../intel_rtile_cxl_top_cxltyp2_ed/intel_rtile_cxl_top_cxltyp2_ed.qip
+
+# ============================================================================
+# rv64 Vortex GPU + CXL MemUring Integration
+# ============================================================================
+
+# CXL MemUring packages (compile order: base pkg first)
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/cxl_memuring_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/cxl_memuring_vortex_pkg.sv
+
+# Vortex GPU packages
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/VX_gpu_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/VX_trace_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_pkg.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_pkg.sv
+
+# Vortex GPU interfaces
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_dispatch_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_commit_csr_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_decode_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_writeback_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_result_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_branch_ctl_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_operands_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_execute_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_commit_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_scoreboard_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_ibuffer_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_dcr_bus_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_sched_csr_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_fetch_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_decode_sched_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_schedule_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_commit_sched_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_warp_ctl_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/interfaces/VX_issue_sched_if.sv
+
+# Vortex GPU libraries
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_pipe_register.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_pipe_buffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_skid_buffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_bypass_buffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_elastic_buffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_elastic_adapter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_toggle_buffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_stream_buffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_fifo_queue.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_dp_ram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_sp_ram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_async_ram_patch.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_shift_register.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_find_first.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_lzc.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_popcount.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_priority_encoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_onehot_encoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_onehot_mux.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_onehot_shift.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_mux.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_demux.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_reduce_tree.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_scan.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_transpose.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_bits_insert.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_bits_remove.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_bits_concat.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_allocator.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_index_buffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_index_queue.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_pending_size.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_generic_arbiter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_cyclic_arbiter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_priority_arbiter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_rr_arbiter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_matrix_arbiter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_stream_arb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_stream_switch.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_stream_xbar.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_stream_xpoint.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_stream_omega.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_stream_pack.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_stream_unpack.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_edge_trigger.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_nz_iterator.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_placeholder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_reset_relay.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_ticket_lock.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_pe_serializer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_serial_mul.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_serial_div.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_divider.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_multiplier.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_scope_tap.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_scope_switch.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_mem_coalescer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_mem_scheduler.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_mem_bank_adapter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_mem_data_adapter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_axi_adapter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_axi_write_ack.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/libs/VX_avs_adapter.sv
+
+# Vortex GPU memory subsystem
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_lsu_mem_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_mem_bus_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_gbar_bus_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_mem_arb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_mem_switch.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_lsu_mem_arb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_lsu_adapter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_lmem_switch.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_local_mem.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_local_mem_top.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_gbar_arb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/mem/VX_gbar_unit.sv
+
+# Vortex GPU FPU
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fp_classifier.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fp_rounding.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_csr_if.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fcvt_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fncp_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_cvt.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_div.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_fma.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_ncp.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_sqrt.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_dpi.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_dsp.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_fpnew.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/VX_fpu_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/ip/acl_fdiv.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/ip/acl_fmadd.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/fpu/ip/acl_fsqrt.sv
+
+# Vortex GPU TCU - disabled (EXT_TCU_ENABLE not defined, HardFloat dependency missing)
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/bhf/VX_tcu_bhf_bf16mul.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/bhf/VX_tcu_bhf_fadd.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/bhf/VX_tcu_bhf_fmul.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/bhf/bsg_counting_leading_zeros.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_fedp_bhf.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_fedp_dpi.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_fedp_dsp.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_fedp_int.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_fp.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_int.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_uops.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_unit.sv
+# set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/tcu/VX_tcu_top.sv
+
+# Vortex GPU core
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_alu_int.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_alu_muldiv.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_alu_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_csr_data.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_csr_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_dcr_data.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_decode.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_dispatch.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_dispatch_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_execute.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_fetch.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_gather_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_ibuffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_ipdom_stack.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_issue.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_issue_slice.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_issue_top.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_lsu_slice.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_lsu_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_mem_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_mem_unit_top.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_opc_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_operands.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_pe_switch.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_schedule.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_scoreboard.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_sfu_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_split_join.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_uop_sequencer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_uuid_gen.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_wctl_unit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_commit.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/core/VX_core_top.sv
+
+# Vortex GPU cache
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_data.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_tags.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_repl.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_mshr.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_init.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_flush.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_bypass.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_bank.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_wrap.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_top.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/cache/VX_cache_cluster.sv
+
+# Vortex GPU top-level hierarchy
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/VX_socket.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/VX_cluster.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/Vortex.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex/Vortex_axi.sv
+
+# Vortex GPU wrapper for CXL Type2
+set_global_assignment -name SYSTEMVERILOG_FILE ./common/rv64/vortex_gpu_wrapper.sv
+
+# ============================================================================
+# End rv64 Vortex GPU + CXL MemUring
+# ============================================================================
 
 set_global_assignment -name SYSTEMVERILOG_FILE ed_top_wrapper_typ2.sv
 set_global_assignment -name SYSTEMVERILOG_FILE cxltyp2_ed.sv

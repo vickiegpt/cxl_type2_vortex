@@ -35,46 +35,47 @@ package cxl_memuring_vortex_pkg;
     // ============================================================================
 
     // Vortex capability registers (read-only)
-    localparam logic [11:0] CSR_VX_NUM_SM           = 12'h090;
-    localparam logic [11:0] CSR_VX_NUM_CORES_PER_SM = 12'h094;
-    localparam logic [11:0] CSR_VX_WARP_SIZE        = 12'h098;
-    localparam logic [11:0] CSR_VX_MAX_THREADS      = 12'h09C;
-    localparam logic [11:0] CSR_VX_L1_CACHE_SIZE    = 12'h0A0;
-    localparam logic [11:0] CSR_VX_L2_CACHE_SIZE    = 12'h0A4;
-    localparam logic [11:0] CSR_VX_SHARED_MEM_SIZE  = 12'h0A8;
+    // NOTE: Relocated to 0x300+ to avoid conflicts with cxl_memuring_pkg CSR space
+    localparam logic [11:0] CSR_VX_NUM_SM           = 12'h300;
+    localparam logic [11:0] CSR_VX_NUM_CORES_PER_SM = 12'h304;
+    localparam logic [11:0] CSR_VX_WARP_SIZE        = 12'h308;
+    localparam logic [11:0] CSR_VX_MAX_THREADS      = 12'h30C;
+    localparam logic [11:0] CSR_VX_L1_CACHE_SIZE    = 12'h310;
+    localparam logic [11:0] CSR_VX_L2_CACHE_SIZE    = 12'h314;
+    localparam logic [11:0] CSR_VX_SHARED_MEM_SIZE  = 12'h318;
 
     // Vortex configuration registers
-    localparam logic [11:0] CSR_VX_SCHED_MODE       = 12'h0AC;  // Scheduler mode
-    localparam logic [11:0] CSR_VX_STREAM_MAP       = 12'h0B0;  // Queue→Stream mapping
-    localparam logic [11:0] CSR_VX_PORT_AFFINITY    = 12'h0B8;  // Default port affinity
-    localparam logic [11:0] CSR_VX_KERNEL_ENTRY     = 12'h0BC;  // Kernel entry point
-    localparam logic [11:0] CSR_VX_CONST_BASE       = 12'h0C4;  // Constant memory base
-    localparam logic [11:0] CSR_VX_CONST_SIZE       = 12'h0CC;  // Constant memory size
+    localparam logic [11:0] CSR_VX_SCHED_MODE       = 12'h320;  // Scheduler mode
+    localparam logic [11:0] CSR_VX_STREAM_MAP       = 12'h324;  // Queue->Stream mapping
+    localparam logic [11:0] CSR_VX_PORT_AFFINITY    = 12'h328;  // Default port affinity
+    localparam logic [11:0] CSR_VX_KERNEL_ENTRY     = 12'h32C;  // Kernel entry point
+    localparam logic [11:0] CSR_VX_CONST_BASE       = 12'h330;  // Constant memory base
+    localparam logic [11:0] CSR_VX_CONST_SIZE       = 12'h338;  // Constant memory size
 
     // Vortex runtime registers
-    localparam logic [11:0] CSR_VX_KERNEL_START     = 12'h0D0;  // Write 1 to launch
-    localparam logic [11:0] CSR_VX_KERNEL_DONE      = 12'h0D4;  // Kernel completion
-    localparam logic [11:0] CSR_VX_GRID_DIM_X       = 12'h0D8;  // Grid dimension X
-    localparam logic [11:0] CSR_VX_GRID_DIM_Y       = 12'h0DC;  // Grid dimension Y
-    localparam logic [11:0] CSR_VX_GRID_DIM_Z       = 12'h0E0;  // Grid dimension Z
-    localparam logic [11:0] CSR_VX_BLOCK_DIM_X      = 12'h0E4;  // Block dimension X
-    localparam logic [11:0] CSR_VX_BLOCK_DIM_Y      = 12'h0E8;  // Block dimension Y
-    localparam logic [11:0] CSR_VX_BLOCK_DIM_Z      = 12'h0EC;  // Block dimension Z
-    localparam logic [11:0] CSR_VX_KERNEL_PARAM_PTR = 12'h0F0;  // Kernel parameters
-    localparam logic [11:0] CSR_VX_SHARED_MEM_ALLOC = 12'h0F8;  // Allocated shared mem
+    localparam logic [11:0] CSR_VX_KERNEL_START     = 12'h340;  // Write 1 to launch
+    localparam logic [11:0] CSR_VX_KERNEL_DONE      = 12'h344;  // Kernel completion
+    localparam logic [11:0] CSR_VX_GRID_DIM_X       = 12'h348;  // Grid dimension X
+    localparam logic [11:0] CSR_VX_GRID_DIM_Y       = 12'h34C;  // Grid dimension Y
+    localparam logic [11:0] CSR_VX_GRID_DIM_Z       = 12'h350;  // Grid dimension Z
+    localparam logic [11:0] CSR_VX_BLOCK_DIM_X      = 12'h354;  // Block dimension X
+    localparam logic [11:0] CSR_VX_BLOCK_DIM_Y      = 12'h358;  // Block dimension Y
+    localparam logic [11:0] CSR_VX_BLOCK_DIM_Z      = 12'h35C;  // Block dimension Z
+    localparam logic [11:0] CSR_VX_KERNEL_PARAM_PTR = 12'h360;  // Kernel parameters
+    localparam logic [11:0] CSR_VX_SHARED_MEM_ALLOC = 12'h368;  // Allocated shared mem
 
     // Vortex performance counters
-    localparam logic [11:0] CSR_VX_PERF_CYCLES          = 12'h100;
-    localparam logic [11:0] CSR_VX_PERF_COMPUTE_CYCLES  = 12'h108;
-    localparam logic [11:0] CSR_VX_PERF_IDLE_CYCLES     = 12'h110;
-    localparam logic [11:0] CSR_VX_PERF_MEMORY_STALLS   = 12'h118;
-    localparam logic [11:0] CSR_VX_PERF_WARP_DIVERGENCE = 12'h120;
-    localparam logic [11:0] CSR_VX_PERF_L1_HITS         = 12'h128;
-    localparam logic [11:0] CSR_VX_PERF_L1_MISSES       = 12'h130;
-    localparam logic [11:0] CSR_VX_PERF_L2_HITS         = 12'h138;
-    localparam logic [11:0] CSR_VX_PERF_L2_MISSES       = 12'h140;
-    localparam logic [11:0] CSR_VX_PERF_AXI_READS       = 12'h148;
-    localparam logic [11:0] CSR_VX_PERF_AXI_WRITES      = 12'h150;
+    localparam logic [11:0] CSR_VX_PERF_CYCLES          = 12'h380;
+    localparam logic [11:0] CSR_VX_PERF_COMPUTE_CYCLES  = 12'h388;
+    localparam logic [11:0] CSR_VX_PERF_IDLE_CYCLES     = 12'h390;
+    localparam logic [11:0] CSR_VX_PERF_MEMORY_STALLS   = 12'h398;
+    localparam logic [11:0] CSR_VX_PERF_WARP_DIVERGENCE = 12'h3A0;
+    localparam logic [11:0] CSR_VX_PERF_L1_HITS         = 12'h3A8;
+    localparam logic [11:0] CSR_VX_PERF_L1_MISSES       = 12'h3B0;
+    localparam logic [11:0] CSR_VX_PERF_L2_HITS         = 12'h3B8;
+    localparam logic [11:0] CSR_VX_PERF_L2_MISSES       = 12'h3C0;
+    localparam logic [11:0] CSR_VX_PERF_AXI_READS       = 12'h3C8;
+    localparam logic [11:0] CSR_VX_PERF_AXI_WRITES      = 12'h3D0;
 
     // ============================================================================
     // Vortex Scheduler Modes
