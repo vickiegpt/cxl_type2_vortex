@@ -430,6 +430,10 @@ module VX_cache_bank import VX_gpu_pkg::*; #(
     wire[`CS_WORDS_PER_LINE-1:0][`CS_WORD_WIDTH-1:0] read_data_st1;
     wire [LINE_SIZE-1:0] evict_byteen_st1;
 
+    // Deferred write-on-hit signal: commit write in st1 using registered signals
+    // This breaks the critical path: tag_matches_st0 -> data_store write enable
+    wire do_write_hit_st1 = do_write_st1 && is_hit_st1 && ~pipe_stall;
+
     VX_cache_data #(
         .CACHE_SIZE   (CACHE_SIZE),
         .LINE_SIZE    (LINE_SIZE),
@@ -456,10 +460,40 @@ module VX_cache_bank import VX_gpu_pkg::*; #(
         .word_idx   (word_idx_st0),
         .write_byteen(byteen_st0),
         .way_idx_r  (way_idx_st1),
+        // deferred write-on-hit (st1 signals - breaks tag_matches critical path)
+        .write_hit       (do_write_hit_st1),
+        .write_hit_idx   (line_idx_st1),
+        .write_hit_way   (way_idx_st1),
+        .write_hit_word  (write_word_st1),
+        .write_hit_widx  (word_idx_st1),
+        .write_hit_byteen(byteen_st1),
         // outputs
         .read_data  (read_data_st1),
         .evict_byteen(evict_byteen_st1)
     );
+
+    // RAW forwarding: when a deferred write in st1 and a read in st0 target the
+    // same line simultaneously, the dp_ram read port returns stale data (RDW_MODE="R").
+    // We register the deferred write and forward in the next st1 if addresses match.
+    reg                                    fwd_valid_r;
+    reg [`CS_LINE_SEL_BITS-1:0]            fwd_line_idx_r;
+    reg [`CS_WAY_SEL_WIDTH-1:0]            fwd_way_idx_r;
+    reg [`CS_WORD_WIDTH-1:0]               fwd_word_r;
+    reg [`UP(`CS_WORD_SEL_BITS)-1:0]       fwd_widx_r;
+    reg [WORD_SIZE-1:0]                    fwd_byteen_r;
+
+    always @(posedge clk) begin
+        if (reset) begin
+            fwd_valid_r <= 1'b0;
+        end else if (~pipe_stall) begin
+            fwd_valid_r    <= do_write_hit_st1;
+            fwd_line_idx_r <= line_idx_st1;
+            fwd_way_idx_r  <= way_idx_st1;
+            fwd_word_r     <= write_word_st1;
+            fwd_widx_r     <= word_idx_st1;
+            fwd_byteen_r   <= byteen_st1;
+        end
+    end
 
     // only allocate MSHR entries for non-replay core requests
     wire mshr_allocate_st0 = valid_st0 && is_creq_st0 && ~is_replay_st0;
@@ -552,8 +586,24 @@ module VX_cache_bank import VX_gpu_pkg::*; #(
 
     assign crsp_queue_valid = do_read_st1 && is_hit_st1;
     assign crsp_queue_idx   = req_idx_st1;
-    assign crsp_queue_data  = read_data_st1[word_idx_st1];
     assign crsp_queue_tag   = tag_st1;
+
+    // RAW forwarding merge: if previous cycle's deferred write targeted the same
+    // line/way/word as this read, forward the written bytes into the read result.
+    wire fwd_match = fwd_valid_r
+                  && (line_idx_st1 == fwd_line_idx_r)
+                  && (way_idx_st1 == fwd_way_idx_r)
+                  && (word_idx_st1 == fwd_widx_r);
+
+    wire [`CS_WORD_WIDTH-1:0] raw_read_word = read_data_st1[word_idx_st1];
+    wire [`CS_WORD_WIDTH-1:0] fwd_read_word;
+    for (genvar b = 0; b < WORD_SIZE; ++b) begin : g_fwd_merge
+        assign fwd_read_word[b*8 +: 8] = (fwd_match && fwd_byteen_r[b])
+                                        ? fwd_word_r[b*8 +: 8]
+                                        : raw_read_word[b*8 +: 8];
+    end
+
+    assign crsp_queue_data = fwd_read_word;
 
     VX_elastic_buffer #(
         .DATAW   (TAG_WIDTH + `CS_WORD_WIDTH + REQ_SEL_WIDTH),

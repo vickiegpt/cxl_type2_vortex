@@ -47,6 +47,13 @@ module VX_cache_data import VX_gpu_pkg::*; #(
     input wire [WORD_SIZE-1:0]          write_byteen,
     input wire [`UP(`CS_WORD_SEL_BITS)-1:0] word_idx,
     input wire [`CS_WAY_SEL_WIDTH-1:0]  way_idx_r,
+    // Deferred write-on-hit inputs (from pipeline st1 - breaks tag_matches critical path)
+    input wire                          write_hit,
+    input wire [`CS_LINE_SEL_BITS-1:0]  write_hit_idx,
+    input wire [`CS_WAY_SEL_WIDTH-1:0]  write_hit_way,
+    input wire [`CS_WORD_WIDTH-1:0]     write_hit_word,
+    input wire [`UP(`CS_WORD_SEL_BITS)-1:0] write_hit_widx,
+    input wire [WORD_SIZE-1:0]          write_hit_byteen,
     // outputs
     output wire [`CS_LINE_WIDTH-1:0]    read_data,
     output wire [LINE_SIZE-1:0]         evict_byteen
@@ -99,29 +106,46 @@ module VX_cache_data import VX_gpu_pkg::*; #(
 
     wire [NUM_WAYS-1:0][`CS_WORDS_PER_LINE-1:0][`CS_WORD_WIDTH-1:0] line_rdata;
 
+    // Compute write-on-hit byte mask from st1 signals
+    wire [`CS_WORDS_PER_LINE-1:0][WORD_SIZE-1:0] write_hit_mask;
+    for (genvar i = 0; i < `CS_WORDS_PER_LINE; ++i) begin : g_write_hit_mask
+        wire word_en = (`CS_WORDS_PER_LINE == 1) || (write_hit_widx == i);
+        assign write_hit_mask[i] = write_hit_byteen & {WORD_SIZE{word_en}};
+    end
+
     for (genvar i = 0; i < NUM_WAYS; ++i) begin : g_data_store
 
         localparam WRENW = WRITE_ENABLE ? LINE_SIZE : 1;
 
+        // Fill write (st0) - no tag_matches dependency
+        wire fill_write = fill && ((NUM_WAYS == 1) || (evict_way == i));
+
+        // Deferred write-on-hit (st1) - uses registered way index, breaks critical path
+        wire hit_write = write_hit && ((NUM_WAYS == 1) || (write_hit_way == i)) && WRITE_ENABLE;
+
         wire [`CS_WORDS_PER_LINE-1:0][`CS_WORD_WIDTH-1:0] line_wdata;
         wire [WRENW-1:0] line_wren;
+        wire [`CS_LINE_SEL_BITS-1:0] line_waddr;
 
         if (WRITE_ENABLE) begin : g_wren
-            assign line_wdata = fill ? fill_data : {`CS_WORDS_PER_LINE{write_word}};
-            assign line_wren  = {LINE_SIZE{fill}} | write_mask;
+            // Fill takes priority over deferred write-on-hit (safe for writethrough:
+            // write data already sent to memory, and fill replaces the evicted line)
+            assign line_wdata = fill_write ? fill_data : {`CS_WORDS_PER_LINE{write_hit_word}};
+            assign line_wren  = fill_write ? {LINE_SIZE{1'b1}} : write_hit_mask;
+            assign line_waddr = fill_write ? line_idx : write_hit_idx;
         end else begin : g_no_wren
-            `UNUSED_VAR (write_word)
-            `UNUSED_VAR (write_mask)
+            `UNUSED_VAR (write_hit_word)
+            `UNUSED_VAR (write_hit_mask)
             assign line_wdata = fill_data;
             assign line_wren  = 1'b1;
+            assign line_waddr = line_idx;
         end
 
-        wire line_write = (fill && ((NUM_WAYS == 1) || (evict_way == i)))
-                       || (write && tag_matches[i] && WRITE_ENABLE);
+        wire line_write = fill_write || hit_write;
 
         wire line_read = read || ((fill || flush) && WRITEBACK);
 
-        VX_sp_ram #(
+        VX_dp_ram #(
             .DATAW (`CS_LINE_WIDTH),
             .SIZE  (`CS_LINES_PER_BANK),
             .WRENW (WRENW),
@@ -133,7 +157,8 @@ module VX_cache_data import VX_gpu_pkg::*; #(
             .read  (line_read),
             .write (line_write),
             .wren  (line_wren),
-            .addr  (line_idx),
+            .waddr (line_waddr),
+            .raddr (line_idx),
             .wdata (line_wdata),
             .rdata (line_rdata[i])
         );
