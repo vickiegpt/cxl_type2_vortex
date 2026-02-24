@@ -1,0 +1,222 @@
+# Makefile.sim - Vortex GPU Wrapper Simulation Build System
+# For CXL Type2 Device with DCOH Support
+#
+# Usage:
+#   make -f Makefile.sim sim          # Run default simulation
+#   make -f Makefile.sim test         # Run kernel launch test
+#   make -f Makefile.sim lint         # Lint check only
+#   make -f Makefile.sim clean        # Clean build artifacts
+
+#=============================================================================
+# Configuration
+#=============================================================================
+
+TOP_MODULE     ?= tb_vortex_gpu_wrapper
+SIM_TOP        ?= $(TOP_MODULE)
+WORK_DIR       := work
+RESULTS_DIR    := results
+
+# Vortex configuration
+VORTEX_DIR     := ../hardware_test_design/common/rv64/vortex
+RV64_DIR       := ../hardware_test_design/common/rv64
+COMMON_DIR     := ../hardware_test_design/common
+
+# Simulator selection
+SIM            ?= verilator
+VERILATOR      ?= verilator
+QUESTA         ?= vsim
+
+# Compiler settings
+CXX            ?= g++
+CXXFLAGS       := -std=c++17 -O2 -Wall -I$(VORTEX_DIR) -DVL_DEBUG
+
+#=============================================================================
+# Source Files
+#=============================================================================
+
+# Vortex core RTL (recursive find)
+VORTEX_SRC := $(shell find $(VORTEX_DIR) -name "*.sv" -o -name "*.v" 2>/dev/null | sort)
+
+# Package files (must be compiled first)
+PKG_SRC := \
+    $(RV64_DIR)/cxl_memuring_pkg.sv \
+    $(RV64_DIR)/cxl_memuring_vortex_pkg.sv \
+    $(VORTEX_DIR)/VX_gpu_pkg.sv \
+    $(COMMON_DIR)/axi_to_avst/axi_avst_if_pkg.sv
+
+# Main design files
+DESIGN_SRC := \
+    $(RV64_DIR)/vortex_gpu_wrapper.sv \
+    $(RV64_DIR)/vortex_dcoh_writeback.sv
+
+# Testbench files
+TB_SRC := \
+    tb_vortex_gpu_wrapper.sv
+
+# C++ test files
+CPP_SRC := \
+    test_kernel_launch.cpp \
+    sim_main.cpp
+
+#=============================================================================
+# Include paths
+#=============================================================================
+
+INCDIRS := \
+    +incdir+$(VORTEX_DIR) \
+    +incdir+$(RV64_DIR) \
+    +incdir+$(COMMON_DIR) \
+    +incdir+$(COMMON_DIR)/axi_to_avst \
+    +incdir+$(COMMON_DIR)/cafu_csr0
+
+# Vortex defines
+VORTEX_DEFINES := \
+    +define+SYNTHESIS \
+    +define+SIMULATION \
+    +define+PLATFORM_MEMORY_INTERLEAVE=0
+
+#=============================================================================
+# Verilator Settings
+#=============================================================================
+
+VERILATOR_FLAGS := \
+    --cc \
+    --exe \
+    --build \
+    -j 0 \
+    --trace \
+    --trace-fst \
+    -Wno-fatal \
+    -Wno-DECLFILENAME \
+    -Wno-UNUSEDSIGNAL \
+    -Wno-UNUSEDPARAM \
+    -Wno-PINCONNECTEMPTY \
+    -Wno-WIDTHEXPAND \
+    -Wno-WIDTHTRUNC \
+    -Wno-CASEINCOMPLETE \
+    --top-module $(SIM_TOP) \
+    --Mdir $(WORK_DIR)/verilator \
+    -o $(SIM_TOP)
+
+VERILATOR_CFLAGS := -CFLAGS "$(CXXFLAGS)"
+
+#=============================================================================
+# Targets
+#=============================================================================
+
+.PHONY: all sim test test_gemm lint clean dirs
+
+all: sim
+
+dirs:
+	@mkdir -p $(WORK_DIR) $(RESULTS_DIR)
+
+#-----------------------------------------------------------------------------
+# Verilator simulation
+#-----------------------------------------------------------------------------
+
+ifeq ($(SIM),verilator)
+
+sim: dirs $(WORK_DIR)/verilator/$(SIM_TOP)
+	@echo "=========================================="
+	@echo "Running Verilator simulation..."
+	@echo "=========================================="
+	cd $(WORK_DIR)/verilator && ./$(SIM_TOP) +trace
+	@echo "Simulation complete. Waveform: $(WORK_DIR)/verilator/trace.fst"
+
+$(WORK_DIR)/verilator/$(SIM_TOP): $(PKG_SRC) $(VORTEX_SRC) $(DESIGN_SRC) $(TB_SRC) $(CPP_SRC)
+	@echo "=========================================="
+	@echo "Building with Verilator..."
+	@echo "=========================================="
+	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_CFLAGS) \
+		$(VORTEX_DEFINES) \
+		$(INCDIRS) \
+		$(PKG_SRC) \
+		$(DESIGN_SRC) \
+		$(TB_SRC) \
+		$(CPP_SRC)
+
+lint: dirs
+	@echo "=========================================="
+	@echo "Linting with Verilator..."
+	@echo "=========================================="
+	$(VERILATOR) --lint-only \
+		-Wno-fatal \
+		$(VORTEX_DEFINES) \
+		$(INCDIRS) \
+		$(PKG_SRC) \
+		$(DESIGN_SRC) \
+		$(TB_SRC)
+
+endif
+
+#-----------------------------------------------------------------------------
+# Questa/ModelSim simulation
+#-----------------------------------------------------------------------------
+
+ifeq ($(SIM),questa)
+
+sim: dirs compile_questa run_questa
+
+compile_questa:
+	@echo "=========================================="
+	@echo "Compiling with Questa..."
+	@echo "=========================================="
+	cd $(WORK_DIR) && \
+	vlib work && \
+	vlog -sv $(VORTEX_DEFINES) $(INCDIRS) \
+		$(PKG_SRC) \
+		$(VORTEX_SRC) \
+		$(DESIGN_SRC) \
+		$(TB_SRC)
+
+run_questa:
+	@echo "=========================================="
+	@echo "Running Questa simulation..."
+	@echo "=========================================="
+	cd $(WORK_DIR) && \
+	$(QUESTA) -c -do "run -all; quit" work.$(SIM_TOP)
+
+endif
+
+#-----------------------------------------------------------------------------
+# Test targets
+#-----------------------------------------------------------------------------
+
+test: sim
+	@echo "=========================================="
+	@echo "Test completed successfully!"
+	@echo "=========================================="
+
+test_gemm: dirs
+	@echo "=========================================="
+	@echo "Building GEMM coherent test..."
+	@echo "=========================================="
+	$(CXX) -std=c++17 -O2 -Wall -o test_gemm_coherent test_gemm_coherent.cpp -lpthread -lm
+	@echo "Running GEMM coherent test..."
+	./test_gemm_coherent
+
+#-----------------------------------------------------------------------------
+# Clean
+#-----------------------------------------------------------------------------
+
+clean:
+	rm -rf $(WORK_DIR) $(RESULTS_DIR)
+	rm -f *.vcd *.fst *.log
+
+#=============================================================================
+# Help
+#=============================================================================
+
+help:
+	@echo "Vortex GPU Wrapper Simulation Makefile"
+	@echo ""
+	@echo "Targets:"
+	@echo "  sim     - Run simulation (default)"
+	@echo "  test    - Run kernel launch test"
+	@echo "  lint    - Lint check only"
+	@echo "  clean   - Clean build artifacts"
+	@echo ""
+	@echo "Variables:"
+	@echo "  SIM=verilator|questa  - Select simulator (default: verilator)"
+	@echo "  TOP_MODULE=name       - Set top module (default: tb_vortex_gpu_wrapper)"
