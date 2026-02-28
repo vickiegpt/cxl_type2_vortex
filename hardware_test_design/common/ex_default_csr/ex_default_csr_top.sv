@@ -1,13 +1,13 @@
 // (C) 2001-2025 Altera Corporation. All rights reserved.
-// Your use of Altera Corporation's design tools, logic functions and other 
-// software and tools, and its AMPP partner logic functions, and any output 
-// files from any of the foregoing (including device programming or simulation 
-// files), and any associated documentation or information are expressly subject 
-// to the terms and conditions of the Altera Program License Subscription 
-// Agreement, Altera IP License Agreement, or other applicable 
-// license agreement, including, without limitation, that your use is for the 
-// sole purpose of programming logic devices manufactured by Altera and sold by 
-// Altera or its authorized distributors.  Please refer to the applicable 
+// Your use of Altera Corporation's design tools, logic functions and other
+// software and tools, and its AMPP partner logic functions, and any output
+// files from any of the foregoing (including device programming or simulation
+// files), and any associated documentation or information are expressly subject
+// to the terms and conditions of the Altera Program License Subscription
+// Agreement, Altera IP License Agreement, or other applicable
+// license agreement, including, without limitation, that your use is for the
+// sole purpose of programming logic devices manufactured by Altera and sold by
+// Altera or its authorized distributors.  Please refer to the applicable
 // agreement for further details.
 
 
@@ -29,17 +29,33 @@
 
 module ex_default_csr_top (
     input  logic        csr_avmm_clk,
-    input  logic        csr_avmm_rstn,  
-    output logic        csr_avmm_waitrequest,  
+    input  logic        csr_avmm_rstn,
+    output logic        csr_avmm_waitrequest,
     output logic [63:0] csr_avmm_readdata,
     output logic        csr_avmm_readdatavalid,
     input  logic [63:0] csr_avmm_writedata,
     input  logic        csr_avmm_poison,
     input  logic [21:0] csr_avmm_address,
     input  logic        csr_avmm_write,
-    input  logic        csr_avmm_read, 
+    input  logic        csr_avmm_read,
     input  logic [7:0]  csr_avmm_byteenable,
-    output logic [31:0] read_delay
+    output logic [31:0] read_delay,
+
+    // Vortex GPU control interface — active-high launch pulse
+    output logic        vx_launch_trigger,
+    // Configuration registers
+    output logic [63:0] vx_kernel_addr,
+    output logic [63:0] vx_kernel_args,
+    output logic [31:0] vx_grid_dim_x,
+    output logic [31:0] vx_grid_dim_y,
+    output logic [31:0] vx_grid_dim_z,
+    output logic [31:0] vx_block_dim_x,
+    output logic [31:0] vx_block_dim_y,
+    output logic [31:0] vx_block_dim_z,
+    // Status feedback from GPU core
+    input  logic [7:0]  vx_status,
+    input  logic [63:0] vx_cycles,
+    input  logic [63:0] vx_instrs
 );
 
 //CSR block
@@ -56,15 +72,20 @@ module ex_default_csr_top (
        .readdatavalid(csr_avmm_readdatavalid),
        .address      ({10'h0,csr_avmm_address}),
        .waitrequest  (csr_avmm_waitrequest),
-       .read_delay   (read_delay)
+       .read_delay   (read_delay),
+       // Vortex GPU interface
+       .vx_launch_trigger (vx_launch_trigger),
+       .vx_kernel_addr    (vx_kernel_addr),
+       .vx_kernel_args    (vx_kernel_args),
+       .vx_grid_dim_x     (vx_grid_dim_x),
+       .vx_grid_dim_y     (vx_grid_dim_y),
+       .vx_grid_dim_z     (vx_grid_dim_z),
+       .vx_block_dim_x    (vx_block_dim_x),
+       .vx_block_dim_y    (vx_block_dim_y),
+       .vx_block_dim_z    (vx_block_dim_z),
+       .vx_status         (vx_status),
+       .vx_cycles         (vx_cycles),
+       .vx_instrs         (vx_instrs)
    );
 
-//USER LOGIC Implementation 
-//
-//
-
-
 endmodule
-`ifdef QUESTA_INTEL_OEM
-`pragma questa_oem_00 "NpqxALF1IWLnI5+60Lg9xq9HtM2KF+YwkmewwNyDZyswoBvMyCE3S0cdOx7RYs1hNZY1rk+400AKHHRwT8kq0NXV9ZEHV2044KnyJQo/SuNnVHQ4JDhN3MgOvdDoZo9KgcC9Juf4ddZgjs4TEqqEmL7qriJav2KrnFMxkjwWAj4Mx1Hrcjj3prFnkhPNAcQv+oqojCGaqsgphG0TAX5TeG6kAv5EJ7nkboWLlvnSZL7kZJTVlyQBokD016H8UrYF0OjYwSq0++NZ1eivWIC2Hqmqcd5ZAt+Cn8iC3rO3ro6Jw141SXryNleBBAQhTDEOomrs5PGiRWkAOfNxzDiSOaiw9mZFkrTXdWolky5qyk8iug+kaLOCR+DTQsEYxu4d0YBH6di8RFB5LdFnQKOjKVLcJL8DAg1tHPOQLgZzNLglZBUDbd6Hu48lhoF/8NxmmKPo62+Ul3vsqGrEcC36yP2DlY/nqMSHNbow5B5gIgnO6bjjEVYGwFJfEIB3G3zfuvv4zTpD1wsyezuAqoaHTba/9m/FoMsh9Z+jEFOBZ/ms9Hq9lzOUhhPXNcysrGwLEePXEV12T2+2ubYf0Xsz+kghba7UIxwXU52WKJ953BwrSriEnKsm2OuLVNJdQRujBL6fjVKa9p+aDVzl5Tok3WelDZ8b9hKKAMTz7dxu0qgzCCYaXNYnqYHvRxJnhLD/pJhBP83si+WzLYMfhJaXPKtKNtoSIY+tf/RpUbdhSbORNEmT6EpWgPRg1d2RuKYtv0xgb4mwdP1+yGA3ie64Axwf+6kGCzmxUkd4BsMNySF26s/0b9oFQj4dDkf15vk+adcijNtB5mDIUk9l7H3ztOOIbv0E90AS+4tQ/wDuNIku/TfGdVpq9/X/j3+ql2ao8IIiuTUK0s92aOm9/1OkSqWIBbTuzw9RwLVTpWxC77AfxqJbLsYj6MF8bEb0cQo7r53z8YNRn2r9IUZg2OjTMIuEtPAke1pRm0foF1qVUVvy8LyWFTwpBRN2WWqhgr6c"
-`endif

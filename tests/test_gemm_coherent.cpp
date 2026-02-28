@@ -128,7 +128,7 @@ public:
 class RealDevice : public DeviceInterface {
 public:
     static constexpr const char* PCI_RESOURCE = "/sys/bus/pci/devices/0000:ad:00.0/resource0";
-    static constexpr size_t BAR0_SIZE = 4096;
+    static constexpr size_t BAR0_SIZE = 2 * 1024 * 1024;  // 2MB per lspci
 
     ~RealDevice() override {
         if (bar0_) { munmap(const_cast<uint32_t*>(bar0_), BAR0_SIZE); bar0_ = nullptr; }

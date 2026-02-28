@@ -448,8 +448,19 @@ import cxl_memuring_vortex_pkg::*;
   output  logic  [511:0] hdm2ip_aximm1_rdata      ,
   output  logic          hdm2ip_aximm1_ruser      ,
   output  logic  [1:0]   hdm2ip_aximm1_rresp      ,
-  input   logic          ip2hdm_aximm1_rready    ,  
-    
+  input   logic          ip2hdm_aximm1_rready    ,
+
+  // GPU CSR via CAFU AVMM (125 MHz domain)
+  input  logic        gpu_avmm_clk,
+  input  logic        gpu_avmm_rstn,
+  input  logic [21:0] gpu_avmm_address,
+  input  logic [63:0] gpu_avmm_writedata,
+  input  logic        gpu_avmm_write,
+  input  logic        gpu_avmm_read,
+  input  logic [7:0]  gpu_avmm_byteenable,
+  output logic        gpu_avmm_waitrequest,
+  output logic [63:0] gpu_avmm_readdata,
+  output logic        gpu_avmm_readdatavalid,
 
 `endif
 
@@ -836,10 +847,11 @@ import cxl_memuring_vortex_pkg::*;
 `endif
 
 //=========================================================================
-// Channel-1 : Intercepted by Vortex GPU Wrapper
+// Channel-1 : Shared between Host HDM and GPU via AXI Arbiter
 //
-// - CXL IP channel 1 AXI -> AXI-to-CSR bridge -> GPU wrapper CSR (host control)
-// - GPU wrapper Port1 -> MC channel 1 (GPU device memory access)
+// - HDM Ch1 AXI (host DAX) -> AXI Arbiter port 0 -> MC Ch1
+// - GPU wrapper Port1       -> AXI Arbiter port 1 -> MC Ch1
+// - GPU CSR control via AVMM (BAR MMIO from host)
 // - GPU wrapper Port0 -> tied off (unused)
 //=========================================================================
 
@@ -861,132 +873,161 @@ vortex_kernel_args_t   dummy_kernel_args;
 assign dummy_kernel_args = '0;
 
 //=========================================================================
-// AXI-to-CSR Bridge: CXL IP channel 1 -> GPU wrapper CSR
-// Converts single-beat AXI write/read to CSR interface
+// AVMM-to-CSR Bridge: CAFU AVMM (125 MHz) -> GPU CSR (400 MHz ip2hdm_clk)
+// Simple req/ack handshake CDC
 //=========================================================================
 
-typedef enum logic [2:0] {
-    AXI_CSR_IDLE,
-    AXI_CSR_WRITE_DATA,
-    AXI_CSR_WRITE_RESP,
-    AXI_CSR_READ_WAIT,
-    AXI_CSR_READ_RESP
-} axi_csr_state_t;
+// AVMM side (125 MHz domain)
+logic        avmm_csr_req;
+logic        avmm_csr_write_r;
+logic [11:0] avmm_csr_addr_r;
+logic [63:0] avmm_csr_wdata_r;
+logic        avmm_csr_done;     // synced back from ip2hdm_clk domain
+logic [63:0] avmm_csr_rdata_r;  // captured read data
 
-axi_csr_state_t axi_csr_state;
-logic [7:0]  axi_csr_saved_id;
-logic [11:0] axi_csr_saved_addr;
+// CDC: req from 125MHz -> 400MHz
+logic avmm_req_sync1, avmm_req_sync2;
+// CDC: ack from 400MHz -> 125MHz
+logic avmm_ack_fast;
+logic avmm_ack_sync1, avmm_ack_sync2;
+// CDC: read data from 400MHz -> 125MHz (stable when ack asserts)
+logic [63:0] avmm_rdata_fast;
 
-always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n) begin
-    if (!ip2hdm_reset_n) begin
-        axi_csr_state    <= AXI_CSR_IDLE;
-        gpu_csr_valid    <= 1'b0;
-        gpu_csr_write    <= 1'b0;
-        gpu_csr_addr     <= 12'h0;
-        gpu_csr_wdata    <= 64'h0;
-        axi_csr_saved_id <= 8'h0;
-        axi_csr_saved_addr <= 12'h0;
-        // AXI slave responses
-        hdm2ip_aximm1_awready <= 1'b0;
-        hdm2ip_aximm1_wready  <= 1'b0;
-        hdm2ip_aximm1_bvalid  <= 1'b0;
-        hdm2ip_aximm1_bid     <= 8'h0;
-        hdm2ip_aximm1_buser   <= 1'b0;
-        hdm2ip_aximm1_bresp   <= 2'b00;
-        hdm2ip_aximm1_arready <= 1'b0;
-        hdm2ip_aximm1_rvalid  <= 1'b0;
-        hdm2ip_aximm1_rlast   <= 1'b0;
-        hdm2ip_aximm1_rid     <= 8'h0;
-        hdm2ip_aximm1_rdata   <= 512'h0;
-        hdm2ip_aximm1_ruser   <= 1'b0;
-        hdm2ip_aximm1_rresp   <= 2'b00;
+// 125 MHz domain: capture AVMM request, generate req toggle
+logic avmm_req_toggle;
+logic avmm_busy;
+
+always_ff @(posedge gpu_avmm_clk or negedge gpu_avmm_rstn) begin
+    if (!gpu_avmm_rstn) begin
+        avmm_req_toggle    <= 1'b0;
+        avmm_busy          <= 1'b0;
+        avmm_csr_write_r   <= 1'b0;
+        avmm_csr_addr_r    <= 12'h0;
+        avmm_csr_wdata_r   <= 64'h0;
+        avmm_csr_rdata_r   <= 64'h0;
+        avmm_ack_sync1     <= 1'b0;
+        avmm_ack_sync2     <= 1'b0;
+        gpu_avmm_readdatavalid <= 1'b0;
     end else begin
-        // Default: deassert handshake signals
-        hdm2ip_aximm1_awready <= 1'b0;
-        hdm2ip_aximm1_wready  <= 1'b0;
-        hdm2ip_aximm1_arready <= 1'b0;
-        gpu_csr_valid         <= 1'b0;
+        // Sync ack from fast domain
+        avmm_ack_sync1 <= avmm_ack_fast;
+        avmm_ack_sync2 <= avmm_ack_sync1;
 
-        case (axi_csr_state)
-            AXI_CSR_IDLE: begin
-                hdm2ip_aximm1_bvalid <= 1'b0;
-                hdm2ip_aximm1_rvalid <= 1'b0;
+        gpu_avmm_readdatavalid <= 1'b0;
 
-                if (ip2hdm_aximm1_awvalid) begin
-                    // AXI Write Address phase
-                    hdm2ip_aximm1_awready <= 1'b1;
-                    axi_csr_saved_id   <= ip2hdm_aximm1_awid;
-                    axi_csr_saved_addr <= ip2hdm_aximm1_awaddr[11:0];
-                    axi_csr_state      <= AXI_CSR_WRITE_DATA;
-                end else if (ip2hdm_aximm1_arvalid) begin
-                    // AXI Read Address phase
-                    hdm2ip_aximm1_arready <= 1'b1;
-                    axi_csr_saved_id   <= ip2hdm_aximm1_arid;
-                    axi_csr_saved_addr <= ip2hdm_aximm1_araddr[11:0];
-                    // Issue CSR read
-                    gpu_csr_valid <= 1'b1;
-                    gpu_csr_write <= 1'b0;
-                    gpu_csr_addr  <= ip2hdm_aximm1_araddr[11:0];
-                    axi_csr_state <= AXI_CSR_READ_WAIT;
+        if (!avmm_busy) begin
+            if (gpu_avmm_write || gpu_avmm_read) begin
+                // Address filtering done in ed_top_wrapper_typ2
+                avmm_busy        <= 1'b1;
+                avmm_csr_write_r <= gpu_avmm_write;
+                avmm_csr_addr_r  <= gpu_avmm_address[11:0];
+                avmm_csr_wdata_r <= gpu_avmm_writedata;
+                avmm_req_toggle  <= ~avmm_req_toggle;
+            end
+        end else begin
+            // Wait for ack toggle to match req toggle
+            if (avmm_ack_sync2 == avmm_req_toggle) begin
+                avmm_busy <= 1'b0;
+                if (!avmm_csr_write_r) begin
+                    avmm_csr_rdata_r       <= avmm_rdata_fast;
+                    gpu_avmm_readdatavalid <= 1'b1;
                 end
             end
-
-            AXI_CSR_WRITE_DATA: begin
-                if (ip2hdm_aximm1_wvalid) begin
-                    hdm2ip_aximm1_wready <= 1'b1;
-                    // Issue CSR write
-                    gpu_csr_valid <= 1'b1;
-                    gpu_csr_write <= 1'b1;
-                    gpu_csr_addr  <= axi_csr_saved_addr;
-                    gpu_csr_wdata <= ip2hdm_aximm1_wdata[63:0];
-                    axi_csr_state <= AXI_CSR_WRITE_RESP;
-                end
-            end
-
-            AXI_CSR_WRITE_RESP: begin
-                if (gpu_csr_ready && !hdm2ip_aximm1_bvalid) begin
-                    // Assert B response, hold until bready handshake
-                    hdm2ip_aximm1_bvalid <= 1'b1;
-                    hdm2ip_aximm1_bid    <= axi_csr_saved_id;
-                    hdm2ip_aximm1_bresp  <= 2'b00;  // OKAY
-                    hdm2ip_aximm1_buser  <= 1'b0;
-                end
-                if (hdm2ip_aximm1_bvalid && ip2hdm_aximm1_bready) begin
-                    // B handshake complete
-                    hdm2ip_aximm1_bvalid <= 1'b0;
-                    axi_csr_state        <= AXI_CSR_IDLE;
-                end
-            end
-
-            AXI_CSR_READ_WAIT: begin
-                if (gpu_csr_ready) begin
-                    // Send read response
-                    hdm2ip_aximm1_rvalid <= 1'b1;
-                    hdm2ip_aximm1_rlast  <= 1'b1;
-                    hdm2ip_aximm1_rid    <= axi_csr_saved_id;
-                    hdm2ip_aximm1_rdata  <= {448'h0, gpu_csr_rdata};
-                    hdm2ip_aximm1_rresp  <= 2'b00;  // OKAY
-                    hdm2ip_aximm1_ruser  <= 1'b0;
-                    axi_csr_state        <= AXI_CSR_READ_RESP;
-                end
-            end
-
-            AXI_CSR_READ_RESP: begin
-                if (ip2hdm_aximm1_rready) begin
-                    hdm2ip_aximm1_rvalid <= 1'b0;
-                    axi_csr_state        <= AXI_CSR_IDLE;
-                end
-            end
-
-            default: axi_csr_state <= AXI_CSR_IDLE;
-        endcase
+        end
     end
 end
 
+assign gpu_avmm_waitrequest = avmm_busy;
+assign gpu_avmm_readdata    = avmm_csr_rdata_r;
+
+// 400 MHz domain: sync req toggle, issue CSR, generate ack toggle
+logic avmm_req_toggle_sync1, avmm_req_toggle_sync2, avmm_req_toggle_prev;
+logic avmm_ack_toggle;
+
+always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n) begin
+    if (!ip2hdm_reset_n) begin
+        avmm_req_toggle_sync1 <= 1'b0;
+        avmm_req_toggle_sync2 <= 1'b0;
+        avmm_req_toggle_prev  <= 1'b0;
+        avmm_ack_toggle       <= 1'b0;
+        gpu_csr_valid          <= 1'b0;
+        gpu_csr_write          <= 1'b0;
+        gpu_csr_addr           <= 12'h0;
+        gpu_csr_wdata          <= 64'h0;
+        avmm_rdata_fast        <= 64'h0;
+    end else begin
+        // Sync req toggle
+        avmm_req_toggle_sync1 <= avmm_req_toggle;
+        avmm_req_toggle_sync2 <= avmm_req_toggle_sync1;
+        avmm_req_toggle_prev  <= avmm_req_toggle_sync2;
+
+        gpu_csr_valid <= 1'b0;
+
+        // Detect req toggle edge
+        if (avmm_req_toggle_sync2 != avmm_req_toggle_prev) begin
+            gpu_csr_valid <= 1'b1;
+            gpu_csr_write <= avmm_csr_write_r;
+            gpu_csr_addr  <= avmm_csr_addr_r;
+            gpu_csr_wdata <= avmm_csr_wdata_r;
+        end
+
+        // When CSR ready, capture read data and send ack
+        if (gpu_csr_valid && gpu_csr_ready) begin
+            avmm_rdata_fast <= gpu_csr_rdata;
+            avmm_ack_toggle <= avmm_req_toggle_sync2;
+        end
+    end
+end
+
+assign avmm_ack_fast = avmm_ack_toggle;
+
 //=========================================================================
-// GPU Port1 intermediate wires (GPU wrapper outputs -> MC channel 1)
+// HDM Ch1 -> Arbiter port 0 response signals (directly driven by arbiter)
+// GPU Port1 intermediate wires (GPU wrapper -> Arbiter port 1)
 //=========================================================================
 
+// Arbiter <-> MC Ch1 intermediate wires
+logic        arb_mc1_awvalid, arb_mc1_awready;
+logic [7:0]  arb_mc1_awid;
+logic [51:0] arb_mc1_awaddr;
+logic [9:0]  arb_mc1_awlen;
+logic [2:0]  arb_mc1_awsize;
+logic [1:0]  arb_mc1_awburst;
+logic [3:0]  arb_mc1_awcache;
+logic [2:0]  arb_mc1_awprot;
+logic [3:0]  arb_mc1_awqos;
+logic [3:0]  arb_mc1_awregion;
+logic        arb_mc1_awuser;
+logic [1:0]  arb_mc1_awlock;
+logic        arb_mc1_wvalid, arb_mc1_wready;
+logic [511:0] arb_mc1_wdata;
+logic [63:0] arb_mc1_wstrb;
+logic        arb_mc1_wlast;
+logic        arb_mc1_wuser;
+logic        arb_mc1_bvalid, arb_mc1_bready;
+logic [7:0]  arb_mc1_bid;
+logic [1:0]  arb_mc1_bresp;
+logic        arb_mc1_buser;
+logic        arb_mc1_arvalid, arb_mc1_arready;
+logic [7:0]  arb_mc1_arid;
+logic [51:0] arb_mc1_araddr;
+logic [9:0]  arb_mc1_arlen;
+logic [2:0]  arb_mc1_arsize;
+logic [1:0]  arb_mc1_arburst;
+logic [3:0]  arb_mc1_arcache;
+logic [2:0]  arb_mc1_arprot;
+logic [3:0]  arb_mc1_arqos;
+logic [3:0]  arb_mc1_arregion;
+logic        arb_mc1_aruser;
+logic [1:0]  arb_mc1_arlock;
+logic        arb_mc1_rvalid, arb_mc1_rready;
+logic [7:0]  arb_mc1_rid;
+logic [511:0] arb_mc1_rdata;
+logic [1:0]  arb_mc1_rresp;
+logic        arb_mc1_rlast;
+logic        arb_mc1_ruser;
+
+// GPU Port1 wires (GPU wrapper outputs)
 logic [3:0]   gpu_p1_awid;
 logic [63:0]  gpu_p1_awaddr;
 logic [7:0]   gpu_p1_awlen;
@@ -1020,11 +1061,24 @@ logic         gpu_p1_rready;
 // Vortex GPU Wrapper Instance
 //=========================================================================
 
+// GPU Port1 response wires (from arbiter back to GPU)
+logic        gpu_p1_awready;
+logic        gpu_p1_wready;
+logic [3:0]  gpu_p1_bid;
+logic [1:0]  gpu_p1_bresp;
+logic        gpu_p1_bvalid;
+logic        gpu_p1_arready;
+logic [3:0]  gpu_p1_rid;
+logic [511:0] gpu_p1_rdata;
+logic [1:0]  gpu_p1_rresp;
+logic        gpu_p1_rlast;
+logic        gpu_p1_rvalid;
+
 vortex_gpu_wrapper vortex_gpu_inst (
     .clk                    (ip2hdm_clk),
     .rst_n                  (ip2hdm_reset_n),
 
-    // CSR interface (from AXI-to-CSR bridge above)
+    // CSR interface (from AVMM-to-CSR bridge above)
     .csr_valid              (gpu_csr_valid),
     .csr_write              (gpu_csr_write),
     .csr_addr               (gpu_csr_addr),
@@ -1079,7 +1133,7 @@ vortex_gpu_wrapper vortex_gpu_inst (
     .m_axi_port0_rvalid     (1'b0),
     .m_axi_port0_rready     (),
 
-    // AXI Port 1 (Device Memory) -> MC channel 1 via intermediate wires
+    // AXI Port 1 (Device Memory) -> Arbiter port 1
     .m_axi_port1_awid       (gpu_p1_awid),
     .m_axi_port1_awaddr     (gpu_p1_awaddr),
     .m_axi_port1_awlen      (gpu_p1_awlen),
@@ -1089,15 +1143,15 @@ vortex_gpu_wrapper vortex_gpu_inst (
     .m_axi_port1_awcache    (gpu_p1_awcache),
     .m_axi_port1_awprot     (gpu_p1_awprot),
     .m_axi_port1_awvalid    (gpu_p1_awvalid),
-    .m_axi_port1_awready    (hdm2ip_aximm_awready[1]),
+    .m_axi_port1_awready    (gpu_p1_awready),
     .m_axi_port1_wdata      (gpu_p1_wdata),
     .m_axi_port1_wstrb      (gpu_p1_wstrb),
     .m_axi_port1_wlast      (gpu_p1_wlast),
     .m_axi_port1_wvalid     (gpu_p1_wvalid),
-    .m_axi_port1_wready     (hdm2ip_aximm_wready[1]),
-    .m_axi_port1_bid        (hdm2ip_aximm_bid[1][3:0]),
-    .m_axi_port1_bresp      (hdm2ip_aximm_bresp[1]),
-    .m_axi_port1_bvalid     (hdm2ip_aximm_bvalid[1]),
+    .m_axi_port1_wready     (gpu_p1_wready),
+    .m_axi_port1_bid        (gpu_p1_bid),
+    .m_axi_port1_bresp      (gpu_p1_bresp),
+    .m_axi_port1_bvalid     (gpu_p1_bvalid),
     .m_axi_port1_bready     (gpu_p1_bready),
     .m_axi_port1_arid       (gpu_p1_arid),
     .m_axi_port1_araddr     (gpu_p1_araddr),
@@ -1108,64 +1162,216 @@ vortex_gpu_wrapper vortex_gpu_inst (
     .m_axi_port1_arcache    (gpu_p1_arcache),
     .m_axi_port1_arprot     (gpu_p1_arprot),
     .m_axi_port1_arvalid    (gpu_p1_arvalid),
-    .m_axi_port1_arready    (hdm2ip_aximm_arready[1]),
-    .m_axi_port1_rid        (hdm2ip_aximm_rid[1][3:0]),
-    .m_axi_port1_rdata      (hdm2ip_aximm_rdata[1]),
-    .m_axi_port1_rresp      (hdm2ip_aximm_rresp[1]),
-    .m_axi_port1_rlast      (hdm2ip_aximm_rlast[1]),
-    .m_axi_port1_rvalid     (hdm2ip_aximm_rvalid[1]),
+    .m_axi_port1_arready    (gpu_p1_arready),
+    .m_axi_port1_rid        (gpu_p1_rid),
+    .m_axi_port1_rdata      (gpu_p1_rdata),
+    .m_axi_port1_rresp      (gpu_p1_rresp),
+    .m_axi_port1_rlast      (gpu_p1_rlast),
+    .m_axi_port1_rvalid     (gpu_p1_rvalid),
     .m_axi_port1_rready     (gpu_p1_rready)
 );
 
 //=========================================================================
-// GPU Port1 -> MC Channel 1 signal assignments
+// AXI MC Arbiter: Host HDM Ch1 (port 0) + GPU Port1 (port 1) -> MC Ch1
 //=========================================================================
 
-// Write address channel (GPU -> MC)
-assign ip2hdm_aximm_awid    [1] = {4'h0, gpu_p1_awid};
-assign ip2hdm_aximm_awaddr  [1] = gpu_p1_awaddr[51:0];
-assign ip2hdm_aximm_awlen   [1] = {2'b00, gpu_p1_awlen};
-assign ip2hdm_aximm_awregion[1] = 4'h0;
-assign ip2hdm_aximm_awuser  [1] = 1'b1;   // target_hdm = 1 (device memory)
-assign ip2hdm_aximm_awsize  [1] = gpu_p1_awsize;
-assign ip2hdm_aximm_awburst [1] = gpu_p1_awburst;
-assign ip2hdm_aximm_awprot  [1] = gpu_p1_awprot;
-assign ip2hdm_aximm_awqos   [1] = 4'h0;
-assign ip2hdm_aximm_awcache [1] = gpu_p1_awcache;
-assign ip2hdm_aximm_awlock  [1] = {1'b0, gpu_p1_awlock};
-assign ip2hdm_aximm_awvalid [1] = gpu_p1_awvalid;
+axi_mc_arbiter #(
+    .ID_WIDTH   (8),
+    .ADDR_WIDTH (52),
+    .DATA_WIDTH (512),
+    .LEN_WIDTH  (10),
+    .GPU_ID_W   (4)
+) u_axi_mc_arbiter (
+    .clk        (ip2hdm_clk),
+    .rst_n      (ip2hdm_reset_n),
 
-// Write data channel (GPU -> MC)
-assign ip2hdm_aximm_wdata   [1] = gpu_p1_wdata;
-assign ip2hdm_aximm_wstrb   [1] = gpu_p1_wstrb;
-assign ip2hdm_aximm_wlast   [1] = gpu_p1_wlast;
-assign ip2hdm_aximm_wuser   [1] = 1'b0;
-assign ip2hdm_aximm_wvalid  [1] = gpu_p1_wvalid;
+    // Master 0: Host HDM Channel 1 from CXL IP
+    .m0_awvalid (ip2hdm_aximm1_awvalid),
+    .m0_awready (hdm2ip_aximm1_awready),
+    .m0_awid    (ip2hdm_aximm1_awid),
+    .m0_awaddr  (ip2hdm_aximm1_awaddr),
+    .m0_awlen   (ip2hdm_aximm1_awlen),
+    .m0_awsize  (ip2hdm_aximm1_awsize),
+    .m0_awburst (ip2hdm_aximm1_awburst),
+    .m0_awcache (ip2hdm_aximm1_awcache),
+    .m0_awprot  (ip2hdm_aximm1_awprot),
+    .m0_awqos   (ip2hdm_aximm1_awqos),
+    .m0_awregion(ip2hdm_aximm1_awregion),
+    .m0_awuser  (ip2hdm_aximm1_awuser),
+    .m0_awlock  (ip2hdm_aximm1_awlock),
+    .m0_wvalid  (ip2hdm_aximm1_wvalid),
+    .m0_wready  (hdm2ip_aximm1_wready),
+    .m0_wdata   (ip2hdm_aximm1_wdata),
+    .m0_wstrb   (ip2hdm_aximm1_wstrb),
+    .m0_wlast   (ip2hdm_aximm1_wlast),
+    .m0_wuser   (ip2hdm_aximm1_wuser),
+    .m0_bvalid  (hdm2ip_aximm1_bvalid),
+    .m0_bready  (ip2hdm_aximm1_bready),
+    .m0_bid     (hdm2ip_aximm1_bid),
+    .m0_bresp   (hdm2ip_aximm1_bresp),
+    .m0_buser   (hdm2ip_aximm1_buser),
+    .m0_arvalid (ip2hdm_aximm1_arvalid),
+    .m0_arready (hdm2ip_aximm1_arready),
+    .m0_arid    (ip2hdm_aximm1_arid),
+    .m0_araddr  (ip2hdm_aximm1_araddr),
+    .m0_arlen   (ip2hdm_aximm1_arlen),
+    .m0_arsize  (ip2hdm_aximm1_arsize),
+    .m0_arburst (ip2hdm_aximm1_arburst),
+    .m0_arcache (ip2hdm_aximm1_arcache),
+    .m0_arprot  (ip2hdm_aximm1_arprot),
+    .m0_arqos   (ip2hdm_aximm1_arqos),
+    .m0_arregion(ip2hdm_aximm1_arregion),
+    .m0_aruser  (ip2hdm_aximm1_aruser),
+    .m0_arlock  (ip2hdm_aximm1_arlock),
+    .m0_rvalid  (hdm2ip_aximm1_rvalid),
+    .m0_rready  (ip2hdm_aximm1_rready),
+    .m0_rid     (hdm2ip_aximm1_rid),
+    .m0_rdata   (hdm2ip_aximm1_rdata),
+    .m0_rresp   (hdm2ip_aximm1_rresp),
+    .m0_rlast   (hdm2ip_aximm1_rlast),
+    .m0_ruser   (hdm2ip_aximm1_ruser),
 
-// Write response channel (MC -> GPU)
-assign ip2hdm_aximm_bready  [1] = gpu_p1_bready;
+    // Master 1: GPU Port1
+    .m1_awvalid (gpu_p1_awvalid),
+    .m1_awready (gpu_p1_awready),
+    .m1_awid    (gpu_p1_awid),
+    .m1_awaddr  (gpu_p1_awaddr),
+    .m1_awlen   (gpu_p1_awlen),
+    .m1_awsize  (gpu_p1_awsize),
+    .m1_awburst (gpu_p1_awburst),
+    .m1_awcache (gpu_p1_awcache),
+    .m1_awprot  (gpu_p1_awprot),
+    .m1_awlock  (gpu_p1_awlock),
+    .m1_wvalid  (gpu_p1_wvalid),
+    .m1_wready  (gpu_p1_wready),
+    .m1_wdata   (gpu_p1_wdata),
+    .m1_wstrb   (gpu_p1_wstrb),
+    .m1_wlast   (gpu_p1_wlast),
+    .m1_bvalid  (gpu_p1_bvalid),
+    .m1_bready  (gpu_p1_bready),
+    .m1_bid     (gpu_p1_bid),
+    .m1_bresp   (gpu_p1_bresp),
+    .m1_arvalid (gpu_p1_arvalid),
+    .m1_arready (gpu_p1_arready),
+    .m1_arid    (gpu_p1_arid),
+    .m1_araddr  (gpu_p1_araddr),
+    .m1_arlen   (gpu_p1_arlen),
+    .m1_arsize  (gpu_p1_arsize),
+    .m1_arburst (gpu_p1_arburst),
+    .m1_arcache (gpu_p1_arcache),
+    .m1_arprot  (gpu_p1_arprot),
+    .m1_arlock  (gpu_p1_arlock),
+    .m1_rvalid  (gpu_p1_rvalid),
+    .m1_rready  (gpu_p1_rready),
+    .m1_rid     (gpu_p1_rid),
+    .m1_rdata   (gpu_p1_rdata),
+    .m1_rresp   (gpu_p1_rresp),
+    .m1_rlast   (gpu_p1_rlast),
 
-// Read address channel (GPU -> MC)
-assign ip2hdm_aximm_arid    [1] = {4'h0, gpu_p1_arid};
-assign ip2hdm_aximm_araddr  [1] = gpu_p1_araddr[51:0];
-assign ip2hdm_aximm_arlen   [1] = {2'b00, gpu_p1_arlen};
-assign ip2hdm_aximm_arregion[1] = 4'h0;
-assign ip2hdm_aximm_aruser  [1] = 1'b1;   // target_hdm = 1 (device memory)
-assign ip2hdm_aximm_arsize  [1] = gpu_p1_arsize;
-assign ip2hdm_aximm_arburst [1] = gpu_p1_arburst;
-assign ip2hdm_aximm_arprot  [1] = gpu_p1_arprot;
-assign ip2hdm_aximm_arqos   [1] = 4'h0;
-assign ip2hdm_aximm_arcache [1] = gpu_p1_arcache;
-assign ip2hdm_aximm_arlock  [1] = {1'b0, gpu_p1_arlock};
-assign ip2hdm_aximm_arvalid [1] = gpu_p1_arvalid;
+    // Slave: MC Channel 1 (via intermediate wires)
+    .s_awvalid  (arb_mc1_awvalid),
+    .s_awready  (arb_mc1_awready),
+    .s_awid     (arb_mc1_awid),
+    .s_awaddr   (arb_mc1_awaddr),
+    .s_awlen    (arb_mc1_awlen),
+    .s_awsize   (arb_mc1_awsize),
+    .s_awburst  (arb_mc1_awburst),
+    .s_awcache  (arb_mc1_awcache),
+    .s_awprot   (arb_mc1_awprot),
+    .s_awqos    (arb_mc1_awqos),
+    .s_awregion (arb_mc1_awregion),
+    .s_awuser   (arb_mc1_awuser),
+    .s_awlock   (arb_mc1_awlock),
+    .s_wvalid   (arb_mc1_wvalid),
+    .s_wready   (arb_mc1_wready),
+    .s_wdata    (arb_mc1_wdata),
+    .s_wstrb    (arb_mc1_wstrb),
+    .s_wlast    (arb_mc1_wlast),
+    .s_wuser    (arb_mc1_wuser),
+    .s_bvalid   (arb_mc1_bvalid),
+    .s_bready   (arb_mc1_bready),
+    .s_bid      (arb_mc1_bid),
+    .s_bresp    (arb_mc1_bresp),
+    .s_buser    (arb_mc1_buser),
+    .s_arvalid  (arb_mc1_arvalid),
+    .s_arready  (arb_mc1_arready),
+    .s_arid     (arb_mc1_arid),
+    .s_araddr   (arb_mc1_araddr),
+    .s_arlen    (arb_mc1_arlen),
+    .s_arsize   (arb_mc1_arsize),
+    .s_arburst  (arb_mc1_arburst),
+    .s_arcache  (arb_mc1_arcache),
+    .s_arprot   (arb_mc1_arprot),
+    .s_arqos    (arb_mc1_arqos),
+    .s_arregion (arb_mc1_arregion),
+    .s_aruser   (arb_mc1_aruser),
+    .s_arlock   (arb_mc1_arlock),
+    .s_rvalid   (arb_mc1_rvalid),
+    .s_rready   (arb_mc1_rready),
+    .s_rid      (arb_mc1_rid),
+    .s_rdata    (arb_mc1_rdata),
+    .s_rresp    (arb_mc1_rresp),
+    .s_rlast    (arb_mc1_rlast),
+    .s_ruser    (arb_mc1_ruser)
+);
 
-// Read response channel (MC -> GPU)
-assign ip2hdm_aximm_rready  [1] = gpu_p1_rready;
+//=========================================================================
+// Arbiter output -> MC Channel 1 signal assignments
+//=========================================================================
 
-`ifndef DELAY_BUFFER_EN
-// Channel 1 CXL IP responses are driven by AXI-to-CSR bridge FSM above
-// Channel 1 MC responses go directly to GPU wrapper via hdm2ip_aximm_*[1]
-`endif
+// Write address channel (Arbiter -> MC)
+assign ip2hdm_aximm_awid    [1] = arb_mc1_awid;
+assign ip2hdm_aximm_awaddr  [1] = arb_mc1_awaddr;
+assign ip2hdm_aximm_awlen   [1] = arb_mc1_awlen;
+assign ip2hdm_aximm_awregion[1] = arb_mc1_awregion;
+assign ip2hdm_aximm_awuser  [1] = arb_mc1_awuser;
+assign ip2hdm_aximm_awsize  [1] = arb_mc1_awsize;
+assign ip2hdm_aximm_awburst [1] = arb_mc1_awburst;
+assign ip2hdm_aximm_awprot  [1] = arb_mc1_awprot;
+assign ip2hdm_aximm_awqos   [1] = arb_mc1_awqos;
+assign ip2hdm_aximm_awcache [1] = arb_mc1_awcache;
+assign ip2hdm_aximm_awlock  [1] = arb_mc1_awlock;
+assign ip2hdm_aximm_awvalid [1] = arb_mc1_awvalid;
+
+// Write data channel (Arbiter -> MC)
+assign ip2hdm_aximm_wdata   [1] = arb_mc1_wdata;
+assign ip2hdm_aximm_wstrb   [1] = arb_mc1_wstrb;
+assign ip2hdm_aximm_wlast   [1] = arb_mc1_wlast;
+assign ip2hdm_aximm_wuser   [1] = arb_mc1_wuser;
+assign ip2hdm_aximm_wvalid  [1] = arb_mc1_wvalid;
+
+// Write response channel (MC -> Arbiter)
+assign arb_mc1_awready = hdm2ip_aximm_awready[1];
+assign arb_mc1_wready  = hdm2ip_aximm_wready[1];
+assign arb_mc1_bvalid  = hdm2ip_aximm_bvalid[1];
+assign arb_mc1_bid     = hdm2ip_aximm_bid[1];
+assign arb_mc1_bresp   = hdm2ip_aximm_bresp[1];
+assign arb_mc1_buser   = hdm2ip_aximm_buser[1];
+assign ip2hdm_aximm_bready[1] = arb_mc1_bready;
+
+// Read address channel (Arbiter -> MC)
+assign ip2hdm_aximm_arid    [1] = arb_mc1_arid;
+assign ip2hdm_aximm_araddr  [1] = arb_mc1_araddr;
+assign ip2hdm_aximm_arlen   [1] = arb_mc1_arlen;
+assign ip2hdm_aximm_arregion[1] = arb_mc1_arregion;
+assign ip2hdm_aximm_aruser  [1] = arb_mc1_aruser;
+assign ip2hdm_aximm_arsize  [1] = arb_mc1_arsize;
+assign ip2hdm_aximm_arburst [1] = arb_mc1_arburst;
+assign ip2hdm_aximm_arprot  [1] = arb_mc1_arprot;
+assign ip2hdm_aximm_arqos   [1] = arb_mc1_arqos;
+assign ip2hdm_aximm_arcache [1] = arb_mc1_arcache;
+assign ip2hdm_aximm_arlock  [1] = arb_mc1_arlock;
+assign ip2hdm_aximm_arvalid [1] = arb_mc1_arvalid;
+
+// Read response channel (MC -> Arbiter)
+assign arb_mc1_arready = hdm2ip_aximm_arready[1];
+assign arb_mc1_rvalid  = hdm2ip_aximm_rvalid[1];
+assign arb_mc1_rid     = hdm2ip_aximm_rid[1];
+assign arb_mc1_rdata   = hdm2ip_aximm_rdata[1];
+assign arb_mc1_rresp   = hdm2ip_aximm_rresp[1];
+assign arb_mc1_rlast   = hdm2ip_aximm_rlast[1];
+assign arb_mc1_ruser   = hdm2ip_aximm_ruser[1];
+assign ip2hdm_aximm_rready[1] = arb_mc1_rready;
 
 
 `endif
@@ -1214,9 +1420,8 @@ typedef struct packed {
       .io_axi_r_out_ready (ip2hdm_aximm0_rready)
       );
 
-    // Channel 1: No delay buffer - GPU wrapper owns this channel
-    // MC read responses go directly to GPU wrapper via hdm2ip_aximm_*[1]
-    // CXL IP ch1 read responses are driven by AXI-to-CSR bridge FSM
+    // Channel 1: No delay buffer needed - arbiter handles response routing
+    // MC Ch1 responses routed by arbiter to host (via hdm2ip_aximm1_*) or GPU
   `endif
 `endif // DELAY_BUFFER_EN
 

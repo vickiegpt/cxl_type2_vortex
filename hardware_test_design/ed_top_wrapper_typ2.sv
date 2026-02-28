@@ -1544,9 +1544,38 @@ always_ff@(posedge ip2hdm_clk) ip2hdm_reset_n_f <= ip2hdm_reset_n ;
 always_ff@(posedge ip2hdm_clk) ip2hdm_reset_n_ff <= ip2hdm_reset_n_f ;
 
   //-------------------------------------------------------
-  // Example design Modules instatances                  
+  // Example design Modules instatances
   //-------------------------------------------------------
 
+  //-------------------------------------------------------
+  // AVMM address decode: split GPU CSR (0x30_0000-0x30_0FFF) from CAFU CSR
+  //-------------------------------------------------------
+  logic gpu_csr_addr_hit;
+  assign gpu_csr_addr_hit = (ip2cafu_avmm_address[21:12] == 10'h300);
+
+  // Signals to cafu_csr0_avmm_wrapper (filtered: not GPU CSR range)
+  logic        cafu_avmm_write_gated;
+  logic        cafu_avmm_read_gated;
+  assign cafu_avmm_write_gated = ip2cafu_avmm_write && !gpu_csr_addr_hit;
+  assign cafu_avmm_read_gated  = ip2cafu_avmm_read  && !gpu_csr_addr_hit;
+
+  // Signals to afu_top GPU CSR interface (filtered: GPU CSR range only)
+  logic        gpu_avmm_write_gated;
+  logic        gpu_avmm_read_gated;
+  assign gpu_avmm_write_gated = ip2cafu_avmm_write && gpu_csr_addr_hit;
+  assign gpu_avmm_read_gated  = ip2cafu_avmm_read  && gpu_csr_addr_hit;
+
+  // Response mux: waitrequest, readdata, readdatavalid
+  logic        gpu_avmm_waitrequest;
+  logic [63:0] gpu_avmm_readdata;
+  logic        gpu_avmm_readdatavalid;
+  logic        cafu_avmm_waitrequest_int;
+  logic [63:0] cafu_avmm_readdata_int;
+  logic        cafu_avmm_readdatavalid_int;
+
+  assign cafu2ip_avmm_waitrequest   = gpu_csr_addr_hit ? gpu_avmm_waitrequest   : cafu_avmm_waitrequest_int;
+  assign cafu2ip_avmm_readdata      = gpu_csr_addr_hit ? gpu_avmm_readdata      : cafu_avmm_readdata_int;
+  assign cafu2ip_avmm_readdatavalid = gpu_csr_addr_hit ? gpu_avmm_readdatavalid : cafu_avmm_readdatavalid_int;
 
 
 cafu_csr0_avmm_wrapper
@@ -1635,14 +1664,14 @@ cafu_csr0_avmm_wrapper_inst
         // CAFU to CXL-IP , to indicate the cache evict policy
         .usr2ip_cache_evict_policy          (        usr2ip_cache_evict_policy          ),                                  
         // Between AFU and CXL_IP CSR Access  AVMM  Bus                           
-        .csr_avmm_waitrequest               (        cafu2ip_avmm_waitrequest           ),                                  
-        .csr_avmm_readdata                  (        cafu2ip_avmm_readdata              ),                                  
-        .csr_avmm_readdatavalid             (        cafu2ip_avmm_readdatavalid         ),                                  
-        .csr_avmm_writedata                 (        ip2cafu_avmm_writedata             ),                                  
-        .csr_avmm_address                   (        ip2cafu_avmm_address               ),                                  
-        .csr_avmm_write                     (        ip2cafu_avmm_write                 ),                                  
-        .csr_avmm_read                      (        ip2cafu_avmm_read                  ),                                  
-        .csr_avmm_poison                    (        ip2cafu_avmm_poison                ),                                  
+        .csr_avmm_waitrequest               (        cafu_avmm_waitrequest_int          ),
+        .csr_avmm_readdata                  (        cafu_avmm_readdata_int             ),
+        .csr_avmm_readdatavalid             (        cafu_avmm_readdatavalid_int        ),
+        .csr_avmm_writedata                 (        ip2cafu_avmm_writedata             ),
+        .csr_avmm_address                   (        ip2cafu_avmm_address               ),
+        .csr_avmm_write                     (        cafu_avmm_write_gated              ),
+        .csr_avmm_read                      (        cafu_avmm_read_gated               ),
+        .csr_avmm_poison                    (        ip2cafu_avmm_poison                ),
         .csr_avmm_byteenable                (        ip2cafu_avmm_byteenable            ),                                   
 	// ATE interface signals
         .afu_ate_ctrl             (afu_ate_ctrl           ), 
@@ -2345,9 +2374,64 @@ intel_cxl_tx_tlp_fifos  inst_tlp_fifos  (
 //Passthrough User can implement the AFU logic here 
 
   //-------------------------------------------------------
-  // PF1 BAR2 example CSR                                --
+  // PF1 BAR2 example CSR + Vortex GPU CSR registers     --
   //-------------------------------------------------------
 wire [31:0] read_delay;
+
+// Vortex GPU CSR interface signals
+wire        vx_launch_trigger;
+wire [63:0] vx_kernel_addr;
+wire [63:0] vx_kernel_args;
+wire [31:0] vx_grid_dim_x;
+wire [31:0] vx_grid_dim_y;
+wire [31:0] vx_grid_dim_z;
+wire [31:0] vx_block_dim_x;
+wire [31:0] vx_block_dim_y;
+wire [31:0] vx_block_dim_z;
+
+// Vortex GPU status — when GPU core is not instantiated, report IDLE
+logic [7:0]  vx_status_r;
+logic [63:0] vx_cycles_r;
+logic [63:0] vx_instrs_r;
+
+// Simple cycle counter for testing (counts while status == RUNNING)
+localparam [7:0] VX_STATUS_IDLE    = 8'h00;
+localparam [7:0] VX_STATUS_RUNNING = 8'h01;
+localparam [7:0] VX_STATUS_DONE    = 8'h02;
+
+always_ff @(posedge ip2csr_avmm_clk or negedge ip2csr_avmm_rstn) begin
+    if (!ip2csr_avmm_rstn) begin
+        vx_status_r <= VX_STATUS_IDLE;
+        vx_cycles_r <= 64'h0;
+        vx_instrs_r <= 64'h0;
+    end else begin
+        case (vx_status_r)
+            VX_STATUS_IDLE: begin
+                if (vx_launch_trigger) begin
+                    vx_status_r <= VX_STATUS_RUNNING;
+                    vx_cycles_r <= 64'h0;
+                    vx_instrs_r <= 64'h0;
+                end
+            end
+            VX_STATUS_RUNNING: begin
+                vx_cycles_r <= vx_cycles_r + 1;
+                // Auto-complete after 1024 cycles (placeholder until real GPU core)
+                if (vx_cycles_r >= 64'd1024) begin
+                    vx_status_r <= VX_STATUS_DONE;
+                end
+            end
+            VX_STATUS_DONE: begin
+                // Stay DONE until next launch
+                if (vx_launch_trigger) begin
+                    vx_status_r <= VX_STATUS_RUNNING;
+                    vx_cycles_r <= 64'h0;
+                    vx_instrs_r <= 64'h0;
+                end
+            end
+            default: vx_status_r <= VX_STATUS_IDLE;
+        endcase
+    end
+end
 
  ex_default_csr_top ex_default_csr_top_inst(
     .csr_avmm_clk                        ( ip2csr_avmm_clk                   ),
@@ -2361,7 +2445,20 @@ wire [31:0] read_delay;
     .csr_avmm_write                      ( ip2csr_avmm_write                 ),
     .csr_avmm_read                       ( ip2csr_avmm_read                  ),
     .csr_avmm_byteenable                 ( ip2csr_avmm_byteenable            ),
-    .read_delay                          ( read_delay                        )
+    .read_delay                          ( read_delay                        ),
+    // Vortex GPU CSR interface
+    .vx_launch_trigger                   ( vx_launch_trigger                 ),
+    .vx_kernel_addr                      ( vx_kernel_addr                    ),
+    .vx_kernel_args                      ( vx_kernel_args                    ),
+    .vx_grid_dim_x                       ( vx_grid_dim_x                     ),
+    .vx_grid_dim_y                       ( vx_grid_dim_y                     ),
+    .vx_grid_dim_z                       ( vx_grid_dim_z                     ),
+    .vx_block_dim_x                      ( vx_block_dim_x                    ),
+    .vx_block_dim_y                      ( vx_block_dim_y                    ),
+    .vx_block_dim_z                      ( vx_block_dim_z                    ),
+    .vx_status                           ( vx_status_r                       ),
+    .vx_cycles                           ( vx_cycles_r                       ),
+    .vx_instrs                           ( vx_instrs_r                       )
  );
 
 // SignalTap IP commented out (sigtap_512.ip not available)
@@ -2516,12 +2613,20 @@ wire [31:0] read_delay;
    .hdm2ip_aximm1_rdata     ( hdm2ip_aximm1_rdata   )  ,
    .hdm2ip_aximm1_ruser     ( hdm2ip_aximm1_ruser   )  ,
    .hdm2ip_aximm1_rresp     ( hdm2ip_aximm1_rresp   )  ,
-   .ip2hdm_aximm1_rready    ( ip2hdm_aximm1_rready  )  , 
-   
- 
+   .ip2hdm_aximm1_rready    ( ip2hdm_aximm1_rready  )  ,
 
+    // GPU CSR via CAFU AVMM
+   .gpu_avmm_clk            ( ip2cafu_avmm_clk         ),
+   .gpu_avmm_rstn           ( ip2cafu_avmm_rstn        ),
+   .gpu_avmm_address        ( ip2cafu_avmm_address      ),
+   .gpu_avmm_writedata      ( ip2cafu_avmm_writedata    ),
+   .gpu_avmm_write          ( gpu_avmm_write_gated      ),
+   .gpu_avmm_read           ( gpu_avmm_read_gated       ),
+   .gpu_avmm_byteenable     ( ip2cafu_avmm_byteenable   ),
+   .gpu_avmm_waitrequest    ( gpu_avmm_waitrequest       ),
+   .gpu_avmm_readdata       ( gpu_avmm_readdata          ),
+   .gpu_avmm_readdatavalid  ( gpu_avmm_readdatavalid     ),
 
- 
      /* External MC_TOP <--> BBS - AXI channels
      */
     .mc_status             ( mc_status ),
