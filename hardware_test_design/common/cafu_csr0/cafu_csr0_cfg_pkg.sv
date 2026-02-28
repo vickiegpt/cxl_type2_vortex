@@ -281,7 +281,7 @@ localparam DVSEC_FBCTRL_STATUS_CACHE_SF_COVERAGE_HI = 7;
 localparam DVSEC_FBCTRL_STATUS_CACHE_SF_COVERAGE_RESET = 5'b0;
 localparam DVSEC_FBCTRL_STATUS_MEM_ENABLE_LO = 2;
 localparam DVSEC_FBCTRL_STATUS_MEM_ENABLE_HI = 2;
-localparam DVSEC_FBCTRL_STATUS_MEM_ENABLE_RESET = 1'b0;
+localparam DVSEC_FBCTRL_STATUS_MEM_ENABLE_RESET = 1'b1;  // Changed: enable CXL.mem at reset (was 1'b0)
 localparam DVSEC_FBCTRL_STATUS_IO_ENABLE_LO = 1;
 localparam DVSEC_FBCTRL_STATUS_IO_ENABLE_HI = 1;
 localparam DVSEC_FBCTRL_STATUS_IO_ENABLE_RESET = 1'b1;
@@ -291,7 +291,7 @@ localparam DVSEC_FBCTRL_STATUS_CACHE_ENABLE_RESET = 1'b0;
 localparam DVSEC_FBCTRL_STATUS_USEMASK = 32'h40004FFF;
 localparam DVSEC_FBCTRL_STATUS_RO_MASK = 32'h2;
 localparam DVSEC_FBCTRL_STATUS_WO_MASK = 32'h0;
-localparam DVSEC_FBCTRL_STATUS_RESET = 32'h2;
+localparam DVSEC_FBCTRL_STATUS_RESET = 32'h6;  // Changed: Cache=0 IO=1 Mem=1 (was 32'h2, IO only)
 
 typedef struct packed {
     logic  [0:0] power_mgt_init_complete;  // RO/V

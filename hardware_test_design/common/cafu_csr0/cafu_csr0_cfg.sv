@@ -1463,7 +1463,7 @@ always_comb begin
  nxt_DVSEC_FBCTRL_STATUS_mem_enable = write_data[34:34];
 
 end
-`RTLGEN_CAFU_CSR0_CFG_EN_FF(gated_clk, rst_n, 1'h0, up_DVSEC_FBCTRL_STATUS_mem_enable[0], nxt_DVSEC_FBCTRL_STATUS_mem_enable[0:0], DVSEC_FBCTRL_STATUS.mem_enable[0:0])
+`RTLGEN_CAFU_CSR0_CFG_EN_FF(gated_clk, rst_n, 1'h1, up_DVSEC_FBCTRL_STATUS_mem_enable[0], nxt_DVSEC_FBCTRL_STATUS_mem_enable[0:0], DVSEC_FBCTRL_STATUS.mem_enable[0:0])  // Changed: reset to 1 (CXL.mem enabled at boot)
 
 // ----------------------------------------------------------------------
 // DVSEC_FBCTRL_STATUS.cache_sf_coverage x5 RW/L, using RW/L template.
