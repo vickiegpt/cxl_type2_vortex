@@ -325,7 +325,13 @@ public:
             return false;
         }
 
-        size_ = req_size;
+        // DAX devices require mmap size aligned to device alignment (typically 2MB)
+        size_t dev_size = get_dax_size(path);
+        constexpr size_t DAX_ALIGN = 2 * 1024 * 1024; // 2MB
+        size_ = (req_size + DAX_ALIGN - 1) & ~(DAX_ALIGN - 1);
+        if (dev_size > 0 && size_ > dev_size)
+            size_ = dev_size;
+
         mem_ = static_cast<uint8_t*>(
             mmap(nullptr, size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd_, 0));
         if (mem_ == MAP_FAILED) {
@@ -344,6 +350,18 @@ public:
     const char* name() const override { return "CxlDaxMemory (/dev/dax)"; }
 
 private:
+    size_t get_dax_size(const std::string& dev_path) {
+        // Extract device name (e.g., "dax12.0" from "/dev/dax12.0")
+        std::string devname = dev_path.substr(dev_path.rfind('/') + 1);
+        std::string sysfs = "/sys/bus/dax/devices/" + devname + "/size";
+        FILE* f = fopen(sysfs.c_str(), "r");
+        if (!f) return 0;
+        size_t sz = 0;
+        if (fscanf(f, "%zu", &sz) != 1) sz = 0;
+        fclose(f);
+        return sz;
+    }
+
     std::string find_dax_device() {
         // Direct path first
         if (access("/dev/dax0.0", F_OK) == 0) return "/dev/dax0.0";
