@@ -54,8 +54,18 @@ module intel_cxl_pio_ed_top #(parameter PF1_BAR01_SIZE_VALUE = 21)
      		output logic           	  pio_to_send_cpl    , //pio about to send output
 		input  logic         	 pio_txc_ready	     ,
      		input 	     [7:0]	 ed_rx_bus_number    ,
-     		input 	     [4:0]	 ed_rx_device_number 
+     		input 	     [4:0]	 ed_rx_device_number ,
 
+		// CSR AVMM master interface (bridges PIO to external register file)
+		output logic          csr_avmm_read        ,
+		output logic          csr_avmm_write       ,
+		output logic [21:0]   csr_avmm_address     ,
+		output logic [63:0]   csr_avmm_writedata   ,
+		output logic [7:0]    csr_avmm_byteenable  ,
+		output logic          csr_avmm_poison      ,
+		input  logic [63:0]   csr_avmm_readdata    ,
+		input  logic          csr_avmm_waitrequest ,
+		input  logic          csr_avmm_readdatavalid
 );
 
 // declarations
@@ -92,16 +102,7 @@ logic  [BAM_DATAWIDTH:0]    cplram_read_data ;
 
 
 
-// mm_interconnect <--> mem0
-logic           mm_interconnect_0_mem0_s1_chipselect;        // mm_interconnect_0:MEM0_s1_chipselect -> MEM0:chipselect
-logic  [1023:0] mm_interconnect_0_mem0_s1_readdata;          // MEM0:readdata -> mm_interconnect_0:MEM0_s1_readdata
-logic     [7:0] mm_interconnect_0_mem0_s1_address;           // mm_interconnect_0:MEM0_s1_address -> MEM0:address
-logic   [127:0] mm_interconnect_0_mem0_s1_byteenable;        // mm_interconnect_0:MEM0_s1_byteenable -> MEM0:byteenable
-logic           mm_interconnect_0_mem0_s1_write;             // mm_interconnect_0:MEM0_s1_write -> MEM0:write
-logic  [1023:0] mm_interconnect_0_mem0_s1_writedata;         // mm_interconnect_0:MEM0_s1_writedata -> MEM0:writedata
-logic           mm_interconnect_0_mem0_s1_clken;             // mm_interconnect_0:MEM0_s1_clken -> MEM0:clken
-
-//pio <--> mm_interconnect
+//pio AVMM master signals (now bridged to external CSR register file)
 logic  [1023:0] pio0_pio_master_readdata;                    // mm_interconnect_0:pio0_pio_master_readdata -> pio0:pio_readdata_i
 logic           pio0_pio_master_waitrequest;                 // mm_interconnect_0:pio0_pio_master_waitrequest -> pio0:pio_waitrequest_i
 logic    [63:0] pio0_pio_master_address;                     // pio0:pio_address_o -> mm_interconnect_0:pio0_pio_master_address
@@ -225,40 +226,41 @@ intel_pcie_bam_v2_cpl
  );
 
 
-pcie_ed_altera_mm_interconnect_1920_sx2feoa mm_interconnect_0 (
-		.pio0_pio_master_address                                      (pio0_pio_master_address),
-		.pio0_pio_master_waitrequest                                  (pio0_pio_master_waitrequest),
-		.pio0_pio_master_burstcount                                   (pio0_pio_master_burstcount),
-		.pio0_pio_master_byteenable                                   (pio0_pio_master_byteenable),
-		.pio0_pio_master_read                                         (pio0_pio_master_read),
-		.pio0_pio_master_readdata                                     (pio0_pio_master_readdata),
-		.pio0_pio_master_readdatavalid                                (pio0_pio_master_readdatavalid),
-		.pio0_pio_master_write                                        (pio0_pio_master_write),
-		.pio0_pio_master_writedata                                    (pio0_pio_master_writedata),
-		.pio0_pio_master_response                                     (pio0_pio_master_response),
-		.MEM0_s1_address                                              (mm_interconnect_0_mem0_s1_address),
-		.MEM0_s1_write                                                (mm_interconnect_0_mem0_s1_write),
-		.MEM0_s1_readdata                                             (mm_interconnect_0_mem0_s1_readdata),
-		.MEM0_s1_writedata                                            (mm_interconnect_0_mem0_s1_writedata),
-		.MEM0_s1_byteenable                                           (mm_interconnect_0_mem0_s1_byteenable),
-		.MEM0_s1_chipselect                                           (mm_interconnect_0_mem0_s1_chipselect),
-		.MEM0_s1_clken                                                (mm_interconnect_0_mem0_s1_clken),
-		.MEM0_reset1_reset_bridge_in_reset_reset                      (~pio_rst_n ),
-		.pio0_pio_master_translator_reset_reset_bridge_in_reset_reset (~pio_rst_n ),
-		.pio0_pio_master_clk_clk                                      (pio_clk )                  
-	);
+//-----------------------------------------------------------------------
+// PIO-to-CSR Bridge
+// Replaces mm_interconnect + pcie_ed_MEM0 with a direct bridge from the
+// PIO AVMM master (1024-bit) to the external CSR register file (64-bit).
+// The PIO master outputs a 64-bit byte address; we extract the correct
+// 64-bit sub-word from the 1024-bit data bus based on address bits [6:3].
+//-----------------------------------------------------------------------
 
-	pcie_ed_MEM0 mem0 (
-		.clk        (pio_clk ),
-		.address    (mm_interconnect_0_mem0_s1_address),
-		.clken      (mm_interconnect_0_mem0_s1_clken),
-		.chipselect (mm_interconnect_0_mem0_s1_chipselect),
-		.write      (mm_interconnect_0_mem0_s1_write),
-		.readdata   (mm_interconnect_0_mem0_s1_readdata),
-		.writedata  (mm_interconnect_0_mem0_s1_writedata),
-		.byteenable (mm_interconnect_0_mem0_s1_byteenable),
-		.reset      (~pio_rst_n )          
-	);
+// Which 64-bit group within the 128-byte (1024-bit) word?
+wire [3:0] csr_grp_idx = pio0_pio_master_address[6:3];
+
+// Forward address (byte-addressed, 22-bit for CSR slave)
+assign csr_avmm_address    = pio0_pio_master_address[21:0];
+
+// Forward read/write controls
+assign csr_avmm_read       = pio0_pio_master_read;
+assign csr_avmm_write      = pio0_pio_master_write;
+assign csr_avmm_poison     = 1'b0;
+
+// Extract 64-bit writedata from 1024-bit PIO writedata
+assign csr_avmm_writedata  = pio0_pio_master_writedata[csr_grp_idx*64 +: 64];
+
+// Extract 8-bit byteenable from 128-bit PIO byteenable
+assign csr_avmm_byteenable = pio0_pio_master_byteenable[csr_grp_idx*8 +: 8];
+
+// Pack 64-bit CSR readdata into 1024-bit PIO readdata at the correct position
+always_comb begin
+    pio0_pio_master_readdata = 1024'h0;
+    pio0_pio_master_readdata[csr_grp_idx*64 +: 64] = csr_avmm_readdata;
+end
+
+// Pass through AVMM handshake signals
+assign pio0_pio_master_waitrequest   = csr_avmm_waitrequest;
+assign pio0_pio_master_readdatavalid = csr_avmm_readdatavalid;
+assign pio0_pio_master_response      = 2'b00; // OKAY
 
 end
 endgenerate

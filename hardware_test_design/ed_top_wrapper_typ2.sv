@@ -868,9 +868,19 @@ import afu_axi_if_pkg::*;
      logic           aer_chk_rx_dvalid	    ;   
      logic           aer_chk_rx_pvalid	    ;   
      logic [31:0]    aer_chk_rx_prefix ;
-    logic                                        pio_rx_passthrough                   ;                                                    
-    logic                                        pio_rx_ready                         ;                                                    
-    logic                                        pio_txc_ready                        ;                                                    
+    logic                                        pio_rx_passthrough                   ;
+    logic                                        pio_rx_ready                         ;
+    // PIO-to-CSR bridge AVMM wires
+    logic                                        pio_csr_avmm_read                    ;
+    logic                                        pio_csr_avmm_write                   ;
+    logic                 [21:0]                 pio_csr_avmm_address                 ;
+    logic                 [63:0]                 pio_csr_avmm_writedata               ;
+    logic                 [7:0]                  pio_csr_avmm_byteenable              ;
+    logic                                        pio_csr_avmm_poison                  ;
+    logic                 [63:0]                 pio_csr_avmm_readdata                ;
+    logic                                        pio_csr_avmm_waitrequest             ;
+    logic                                        pio_csr_avmm_readdatavalid           ;
+    logic                                        pio_txc_ready                        ;
     logic                                        pio_txc_eop                          ; //PIO outputs                                                   
     logic                                        pio_txc_sop                          ;                                                    
     logic                 [127:0]                pio_txc_header                       ;                                                    
@@ -2115,8 +2125,18 @@ intel_cxl_pio_ed_top #(.PF1_BAR01_SIZE_VALUE (PF1_BAR01_SIZE_VALUE ))
 		.pio_txc_valid             (     pio_txc_valid             ),  
     		.pio_to_send_cpl	   (	 pio_to_send_cpl	   ),
 		.ed_rx_bus_number          (     ed_rx_bus_number          ),
-		.ed_rx_device_number       (     ed_rx_device_number       )
-		);                                                                                  
+		.ed_rx_device_number       (     ed_rx_device_number       ),
+		// CSR AVMM bridge ports
+		.csr_avmm_read             (     pio_csr_avmm_read         ),
+		.csr_avmm_write            (     pio_csr_avmm_write        ),
+		.csr_avmm_address          (     pio_csr_avmm_address      ),
+		.csr_avmm_writedata        (     pio_csr_avmm_writedata    ),
+		.csr_avmm_byteenable       (     pio_csr_avmm_byteenable   ),
+		.csr_avmm_poison           (     pio_csr_avmm_poison       ),
+		.csr_avmm_readdata         (     pio_csr_avmm_readdata     ),
+		.csr_avmm_waitrequest      (     pio_csr_avmm_waitrequest  ),
+		.csr_avmm_readdatavalid    (     pio_csr_avmm_readdatavalid)
+		);
 
 
   //-------------------------------------------------------
@@ -2399,8 +2419,8 @@ localparam [7:0] VX_STATUS_IDLE    = 8'h00;
 localparam [7:0] VX_STATUS_RUNNING = 8'h01;
 localparam [7:0] VX_STATUS_DONE    = 8'h02;
 
-always_ff @(posedge ip2csr_avmm_clk or negedge ip2csr_avmm_rstn) begin
-    if (!ip2csr_avmm_rstn) begin
+always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n_f) begin
+    if (!ip2hdm_reset_n_f) begin
         vx_status_r <= VX_STATUS_IDLE;
         vx_cycles_r <= 64'h0;
         vx_instrs_r <= 64'h0;
@@ -2433,18 +2453,24 @@ always_ff @(posedge ip2csr_avmm_clk or negedge ip2csr_avmm_rstn) begin
     end
 end
 
+ // Tie off dead ip2csr_avmm bus back to CXL IP (never driven for user BAR)
+ assign csr2ip_avmm_waitrequest   = 1'b0;
+ assign csr2ip_avmm_readdata      = 64'h0;
+ assign csr2ip_avmm_readdatavalid = 1'b0;
+
+ // CSR register file now driven by PIO bridge (same clock domain as PIO: ip2hdm_clk)
  ex_default_csr_top ex_default_csr_top_inst(
-    .csr_avmm_clk                        ( ip2csr_avmm_clk                   ),
-    .csr_avmm_rstn                       ( ip2csr_avmm_rstn                  ),
-    .csr_avmm_waitrequest                ( csr2ip_avmm_waitrequest           ),
-    .csr_avmm_readdata                   ( csr2ip_avmm_readdata              ),
-    .csr_avmm_readdatavalid              ( csr2ip_avmm_readdatavalid         ),
-    .csr_avmm_writedata                  ( ip2csr_avmm_writedata             ),
-    .csr_avmm_poison                     ( ip2csr_avmm_poison                ),
-    .csr_avmm_address                    ( ip2csr_avmm_address               ),
-    .csr_avmm_write                      ( ip2csr_avmm_write                 ),
-    .csr_avmm_read                       ( ip2csr_avmm_read                  ),
-    .csr_avmm_byteenable                 ( ip2csr_avmm_byteenable            ),
+    .csr_avmm_clk                        ( ip2hdm_clk                        ),
+    .csr_avmm_rstn                       ( ip2hdm_reset_n_f                  ),
+    .csr_avmm_waitrequest                ( pio_csr_avmm_waitrequest          ),
+    .csr_avmm_readdata                   ( pio_csr_avmm_readdata             ),
+    .csr_avmm_readdatavalid              ( pio_csr_avmm_readdatavalid        ),
+    .csr_avmm_writedata                  ( pio_csr_avmm_writedata            ),
+    .csr_avmm_poison                     ( pio_csr_avmm_poison               ),
+    .csr_avmm_address                    ( pio_csr_avmm_address              ),
+    .csr_avmm_write                      ( pio_csr_avmm_write                ),
+    .csr_avmm_read                       ( pio_csr_avmm_read                 ),
+    .csr_avmm_byteenable                 ( pio_csr_avmm_byteenable           ),
     .read_delay                          ( read_delay                        ),
     // Vortex GPU CSR interface
     .vx_launch_trigger                   ( vx_launch_trigger                 ),
