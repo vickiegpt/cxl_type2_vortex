@@ -1,7 +1,7 @@
 /**
  * test_csr_readback.cpp
  *
- * Tests whether BAR0 CSR registers on the CXL Type2 device (0000:ad:00.0)
+ * Tests whether BAR0 CSR registers on the CXL Type2 device (0000:3b:00.0)
  * are backed by real FPGA logic by writing test patterns and reading them back.
  *
  * Tests:
@@ -25,7 +25,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-static constexpr const char* PCI_RESOURCE = "/sys/bus/pci/devices/0000:ad:00.0/resource0";
+static constexpr const char* PCI_RESOURCE = "/sys/bus/pci/devices/0000:3b:00.0/resource0";
 static constexpr size_t BAR0_SIZE = 2 * 1024 * 1024;
 
 // Vortex CSR offsets (matching ex_default_csr_avmm_slave.sv)
@@ -87,7 +87,7 @@ static void check(TestResult& r, const char* name, uint32_t offset,
 
 int main() {
     printf("=== CXL Type2 CSR Write/Readback Test ===\n");
-    printf("Device: 0000:ad:00.0\n\n");
+    printf("Device: 0000:3b:00.0\n\n");
 
     int fd = open(PCI_RESOURCE, O_RDWR | O_SYNC);
     if (fd < 0) {

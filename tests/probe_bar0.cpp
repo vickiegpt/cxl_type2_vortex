@@ -17,8 +17,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-static constexpr const char* BAR0_PATH = "/sys/bus/pci/devices/0000:ad:00.0/resource0";
-static constexpr const char* BAR2_PATH = "/sys/bus/pci/devices/0000:ad:00.0/resource2";
+static constexpr const char* BAR0_PATH = "/sys/bus/pci/devices/0000:3b:00.0/resource0";
+static constexpr const char* BAR2_PATH = "/sys/bus/pci/devices/0000:3b:00.0/resource2";
 static constexpr size_t BAR0_SIZE = 2 * 1024 * 1024;
 static constexpr size_t BAR2_SIZE = 128 * 1024;
 
@@ -90,7 +90,7 @@ int main() {
 
     printf("============================================================\n");
     printf("CXL Type2 Safe BAR0 Probe\n");
-    printf("Device: 0000:ad:00.0\n");
+    printf("Device: 0000:3b:00.0\n");
     printf("============================================================\n");
 
     // ---- Map BAR0 ----
