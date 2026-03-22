@@ -961,20 +961,21 @@ always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n) begin
         avmm_req_toggle_sync2 <= avmm_req_toggle_sync1;
         avmm_req_toggle_prev  <= avmm_req_toggle_sync2;
 
-        gpu_csr_valid <= 1'b0;
-
-        // Detect req toggle edge
-        if (avmm_req_toggle_sync2 != avmm_req_toggle_prev) begin
-            gpu_csr_valid <= 1'b1;
-            gpu_csr_write <= avmm_csr_write_r;
-            gpu_csr_addr  <= avmm_csr_addr_r;
-            gpu_csr_wdata <= avmm_csr_wdata_r;
-        end
-
-        // When CSR ready, capture read data and send ack
+        // FIX: Only clear gpu_csr_valid when handshake completes, not every cycle!
+        // This allows gpu_csr_valid to be held until gpu_csr_ready is asserted.
         if (gpu_csr_valid && gpu_csr_ready) begin
+            // Handshake complete - clear valid and capture response
+            gpu_csr_valid <= 1'b0;
             avmm_rdata_fast <= gpu_csr_rdata;
             avmm_ack_toggle <= avmm_req_toggle_sync2;
+        end else begin
+            // Detect req toggle edge (and set valid if not already in handshake)
+            if (avmm_req_toggle_sync2 != avmm_req_toggle_prev) begin
+                gpu_csr_valid <= 1'b1;
+                gpu_csr_write <= avmm_csr_write_r;
+                gpu_csr_addr  <= avmm_csr_addr_r;
+                gpu_csr_wdata <= avmm_csr_wdata_r;
+            end
         end
     end
 end

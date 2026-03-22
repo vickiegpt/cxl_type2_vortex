@@ -870,16 +870,15 @@ import afu_axi_if_pkg::*;
      logic [31:0]    aer_chk_rx_prefix ;
     logic                                        pio_rx_passthrough                   ;
     logic                                        pio_rx_ready                         ;
-    // PIO-to-CSR bridge AVMM wires
+    // PIO-to-CSR bridge AVMM wires (CSR now on ip2csr bus; PIO outputs unused)
     logic                                        pio_csr_avmm_read                    ;
     logic                                        pio_csr_avmm_write                   ;
     logic                 [21:0]                 pio_csr_avmm_address                 ;
     logic                 [63:0]                 pio_csr_avmm_writedata               ;
     logic                 [7:0]                  pio_csr_avmm_byteenable              ;
     logic                                        pio_csr_avmm_poison                  ;
-    logic                 [63:0]                 pio_csr_avmm_readdata                ;
-    logic                                        pio_csr_avmm_waitrequest             ;
-    logic                                        pio_csr_avmm_readdatavalid           ;
+    // Dummy readdatavalid for PIO CSR port (1-cycle delayed from read)
+    logic                                        pio_csr_dummy_rdv                    ;
     logic                                        pio_txc_ready                        ;
     logic                                        pio_txc_eop                          ; //PIO outputs                                                   
     logic                                        pio_txc_sop                          ;                                                    
@@ -1558,24 +1557,28 @@ always_ff@(posedge ip2hdm_clk) ip2hdm_reset_n_ff <= ip2hdm_reset_n_f ;
   //-------------------------------------------------------
 
   //-------------------------------------------------------
-  // AVMM address decode: split GPU CSR (0x30_0000-0x30_0FFF) from CAFU CSR
+  // AVMM address decode for CXL IP internal AVMM master (ip2cafu_avmm_*)
+  // This path MUST remain untouched for CXL IP boot/init to work.
+  // GPU CSR is split off from this bus at AVMM address [21:12]==0x300.
+  // (Note: 0x300000 is unreachable from 2MB BAR0 — GPU CSR is accessed
+  //  via the PIO bridge path below instead.)
   //-------------------------------------------------------
   logic gpu_csr_addr_hit;
   assign gpu_csr_addr_hit = (ip2cafu_avmm_address[21:12] == 10'h300);
 
-  // Signals to cafu_csr0_avmm_wrapper (filtered: not GPU CSR range)
+  // Signals to cafu_csr0_avmm_wrapper (CXL IP AVMM master, non-GPU range)
   logic        cafu_avmm_write_gated;
   logic        cafu_avmm_read_gated;
   assign cafu_avmm_write_gated = ip2cafu_avmm_write && !gpu_csr_addr_hit;
   assign cafu_avmm_read_gated  = ip2cafu_avmm_read  && !gpu_csr_addr_hit;
 
-  // Signals to afu_top GPU CSR interface (filtered: GPU CSR range only)
-  logic        gpu_avmm_write_gated;
-  logic        gpu_avmm_read_gated;
-  assign gpu_avmm_write_gated = ip2cafu_avmm_write && gpu_csr_addr_hit;
-  assign gpu_avmm_read_gated  = ip2cafu_avmm_read  && gpu_csr_addr_hit;
+  // GPU CSR via CXL IP AVMM (unused in practice — address unreachable)
+  logic        ip_gpu_avmm_write_gated;
+  logic        ip_gpu_avmm_read_gated;
+  assign ip_gpu_avmm_write_gated = ip2cafu_avmm_write && gpu_csr_addr_hit;
+  assign ip_gpu_avmm_read_gated  = ip2cafu_avmm_read  && gpu_csr_addr_hit;
 
-  // Response mux: waitrequest, readdata, readdatavalid
+  // Response mux for CXL IP AVMM master
   logic        gpu_avmm_waitrequest;
   logic [63:0] gpu_avmm_readdata;
   logic        gpu_avmm_readdatavalid;
@@ -1587,6 +1590,38 @@ always_ff@(posedge ip2hdm_clk) ip2hdm_reset_n_ff <= ip2hdm_reset_n_f ;
   assign cafu2ip_avmm_readdata      = gpu_csr_addr_hit ? gpu_avmm_readdata      : cafu_avmm_readdata_int;
   assign cafu2ip_avmm_readdatavalid = gpu_csr_addr_hit ? gpu_avmm_readdatavalid : cafu_avmm_readdatavalid_int;
 
+  //-------------------------------------------------------
+  // PIO bridge → GPU CSR direct path (BAR0+0x080000)
+  // This bypasses the CXL IP's AVMM bus entirely.
+  // PIO bridge runs at ip2hdm_clk (400MHz), same as GPU CSR.
+  //-------------------------------------------------------
+  logic pio_gpu_hit;
+  // GPU CSR at BAR0+0x080000: Decode address 0x080000-0x08FFFF range
+  // Address bits [20:16] == 5'h08 covers 0x080000-0x08FFFF
+  assign pio_gpu_hit = (pio_csr_avmm_address[20:16] == 5'h08);
+
+  logic        pio_gpu_write;
+  logic        pio_gpu_read;
+  assign pio_gpu_write = pio_csr_avmm_write && pio_gpu_hit;
+  assign pio_gpu_read  = pio_csr_avmm_read  && pio_gpu_hit;
+
+  // PIO bridge response: mux between GPU CSR (for 0x080xxx) and dummy (for others)
+  logic        pio_resp_waitrequest;
+  logic [63:0] pio_resp_readdata;
+  logic        pio_resp_readdatavalid;
+  logic        pio_dummy_rdv;
+
+  always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n_f) begin
+      if (!ip2hdm_reset_n_f)
+          pio_dummy_rdv <= 1'b0;
+      else
+          pio_dummy_rdv <= pio_csr_avmm_read && !pio_gpu_hit;
+  end
+
+  assign pio_resp_waitrequest   = pio_gpu_hit ? gpu_avmm_waitrequest   : 1'b0;
+  assign pio_resp_readdata      = pio_gpu_hit ? gpu_avmm_readdata      : 64'h0;
+  assign pio_resp_readdatavalid = pio_gpu_hit ? gpu_avmm_readdatavalid : pio_dummy_rdv;
+
 
 cafu_csr0_avmm_wrapper
 #(
@@ -1594,11 +1629,11 @@ cafu_csr0_avmm_wrapper
 )
 cafu_csr0_avmm_wrapper_inst
 (
-        // Clocks                                                                          
+        // Clocks
         .csr_avmm_clk                       (        ip2cafu_avmm_clk                   ),    // AVMM clock : 125MHz
-        .rtl_clk                            (        ip2hdm_clk                         ),    // IP clk         
-        .axi4_mm_clk                        (        ip2hdm_clk                         ),                                  
-        // Resets                                                                          
+        .rtl_clk                            (        ip2hdm_clk                         ),    // IP clk
+        .axi4_mm_clk                        (        ip2hdm_clk                         ),
+        // Resets
         .csr_avmm_rstn                      (        ip2cafu_avmm_rstn                  ),                                  
         .rst_n                              (        ip2hdm_reset_n                     ),                                  
         .axi4_mm_rst_n                      (        ip2hdm_reset_n                     ),                                  
@@ -2103,39 +2138,49 @@ intel_cxl_aer intel_cxl_aer_inst (
 
 
   //-------------------------------------------------------
-  // CXL PIO                                  
+  // CXL PIO
   //-------------------------------------------------------
 
+// -------------------------------------------------------
+// PIO-to-CSR bridge: connects PIO TLP engine to CAFU/GPU CSR space.
+// The PIO bridge decodes BAR0 MMIO reads/writes into AVMM transactions.
+// Its CSR AVMM output drives the same mux as ip2cafu_avmm (which is dead
+// because the CXL IP's mm_interconnect/MEM0 was removed).
+// Response signals are fed back from the cafu2ip_avmm mux.
+// -------------------------------------------------------
+
 intel_cxl_pio_ed_top #(.PF1_BAR01_SIZE_VALUE (PF1_BAR01_SIZE_VALUE ))
-      intel_cxl_pio_ed_top_inst  (                             
+      intel_cxl_pio_ed_top_inst  (
 		.Clk_i                     (     ip2hdm_clk                ),
-		.Rstn_i                    (     ip2hdm_reset_n_f          ),  
-		.pio_rx_bar                (     pio_rx_bar                ),  
-		.pio_rx_eop                (     pio_rx_eop                ),  
-		.pio_rx_header             (     pio_rx_header             ),  
-		.pio_rx_payload            (     pio_rx_payload            ),  
-		.pio_rx_sop                (     pio_rx_sop                ),  
-		.pio_rx_valid              (     pio_rx_hvalid             ),  
-		.pio_rx_ready              (     pio_rx_ready              ),  
-		.pio_txc_ready             (     pio_txc_ready             ),  
-		.pio_txc_eop               (     pio_txc_eop               ),  
-		.pio_txc_header            (     pio_txc_header            ),  
-		.pio_txc_payload           (     pio_txc_payload           ),  
-		.pio_txc_sop               (     pio_txc_sop               ),  
-		.pio_txc_valid             (     pio_txc_valid             ),  
+		.Rstn_i                    (     ip2hdm_reset_n_f          ),
+		.pio_rx_bar                (     pio_rx_bar                ),
+		.pio_rx_eop                (     pio_rx_eop                ),
+		.pio_rx_header             (     pio_rx_header             ),
+		.pio_rx_payload            (     pio_rx_payload            ),
+		.pio_rx_sop                (     pio_rx_sop                ),
+		.pio_rx_valid              (     pio_rx_hvalid             ),
+		.pio_rx_ready              (     pio_rx_ready              ),
+		.pio_txc_ready             (     pio_txc_ready             ),
+		.pio_txc_eop               (     pio_txc_eop               ),
+		.pio_txc_header            (     pio_txc_header            ),
+		.pio_txc_payload           (     pio_txc_payload           ),
+		.pio_txc_sop               (     pio_txc_sop               ),
+		.pio_txc_valid             (     pio_txc_valid             ),
     		.pio_to_send_cpl	   (	 pio_to_send_cpl	   ),
 		.ed_rx_bus_number          (     ed_rx_bus_number          ),
 		.ed_rx_device_number       (     ed_rx_device_number       ),
-		// CSR AVMM bridge ports
+		// CSR AVMM bridge: PIO generates AVMM transactions.
+		// Response comes from dedicated PIO response mux (GPU CSR + dummy).
+		// Does NOT touch cafu2ip_avmm (which belongs to CXL IP AVMM master).
 		.csr_avmm_read             (     pio_csr_avmm_read         ),
 		.csr_avmm_write            (     pio_csr_avmm_write        ),
 		.csr_avmm_address          (     pio_csr_avmm_address      ),
 		.csr_avmm_writedata        (     pio_csr_avmm_writedata    ),
 		.csr_avmm_byteenable       (     pio_csr_avmm_byteenable   ),
 		.csr_avmm_poison           (     pio_csr_avmm_poison       ),
-		.csr_avmm_readdata         (     pio_csr_avmm_readdata     ),
-		.csr_avmm_waitrequest      (     pio_csr_avmm_waitrequest  ),
-		.csr_avmm_readdatavalid    (     pio_csr_avmm_readdatavalid)
+		.csr_avmm_readdata         (     pio_resp_readdata          ),
+		.csr_avmm_waitrequest      (     pio_resp_waitrequest       ),
+		.csr_avmm_readdatavalid    (     pio_resp_readdatavalid     )
 		);
 
 
@@ -2419,8 +2464,11 @@ localparam [7:0] VX_STATUS_IDLE    = 8'h00;
 localparam [7:0] VX_STATUS_RUNNING = 8'h01;
 localparam [7:0] VX_STATUS_DONE    = 8'h02;
 
-always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n_f) begin
-    if (!ip2hdm_reset_n_f) begin
+// GPU status FSM — runs in CSR clock domain (ip2csr_avmm_clk, 125 MHz)
+// so that vx_launch_trigger (output of CSR) and vx_status_r (input to CSR)
+// are in the same clock domain with no CDC required.
+always_ff @(posedge ip2csr_avmm_clk or negedge ip2csr_avmm_rstn) begin
+    if (!ip2csr_avmm_rstn) begin
         vx_status_r <= VX_STATUS_IDLE;
         vx_cycles_r <= 64'h0;
         vx_instrs_r <= 64'h0;
@@ -2453,24 +2501,22 @@ always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n_f) begin
     end
 end
 
- // Tie off dead ip2csr_avmm bus back to CXL IP (never driven for user BAR)
- assign csr2ip_avmm_waitrequest   = 1'b0;
- assign csr2ip_avmm_readdata      = 64'h0;
- assign csr2ip_avmm_readdatavalid = 1'b0;
-
- // CSR register file now driven by PIO bridge (same clock domain as PIO: ip2hdm_clk)
+ // CSR register file driven by CXL IP's internal AVMM interconnect (ip2csr bus).
+ // The CXL IP routes BAR0 vendor-CSR-range accesses (0x000-0xFFF) through this
+ // bus, NOT through the PIO AVST path.  Previous tie-off of this bus caused
+ // readdatavalid to never assert → PCIe completion timeout → reads returned 0xFFFFFFFF.
  ex_default_csr_top ex_default_csr_top_inst(
-    .csr_avmm_clk                        ( ip2hdm_clk                        ),
-    .csr_avmm_rstn                       ( ip2hdm_reset_n_f                  ),
-    .csr_avmm_waitrequest                ( pio_csr_avmm_waitrequest          ),
-    .csr_avmm_readdata                   ( pio_csr_avmm_readdata             ),
-    .csr_avmm_readdatavalid              ( pio_csr_avmm_readdatavalid        ),
-    .csr_avmm_writedata                  ( pio_csr_avmm_writedata            ),
-    .csr_avmm_poison                     ( pio_csr_avmm_poison               ),
-    .csr_avmm_address                    ( pio_csr_avmm_address              ),
-    .csr_avmm_write                      ( pio_csr_avmm_write                ),
-    .csr_avmm_read                       ( pio_csr_avmm_read                 ),
-    .csr_avmm_byteenable                 ( pio_csr_avmm_byteenable           ),
+    .csr_avmm_clk                        ( ip2csr_avmm_clk                   ),
+    .csr_avmm_rstn                       ( ip2csr_avmm_rstn                  ),
+    .csr_avmm_waitrequest                ( csr2ip_avmm_waitrequest           ),
+    .csr_avmm_readdata                   ( csr2ip_avmm_readdata              ),
+    .csr_avmm_readdatavalid              ( csr2ip_avmm_readdatavalid         ),
+    .csr_avmm_writedata                  ( ip2csr_avmm_writedata             ),
+    .csr_avmm_poison                     ( ip2csr_avmm_poison                ),
+    .csr_avmm_address                    ( ip2csr_avmm_address               ),
+    .csr_avmm_write                      ( ip2csr_avmm_write                 ),
+    .csr_avmm_read                       ( ip2csr_avmm_read                  ),
+    .csr_avmm_byteenable                 ( ip2csr_avmm_byteenable            ),
     .read_delay                          ( read_delay                        ),
     // Vortex GPU CSR interface
     .vx_launch_trigger                   ( vx_launch_trigger                 ),
@@ -2641,14 +2687,14 @@ end
    .hdm2ip_aximm1_rresp     ( hdm2ip_aximm1_rresp   )  ,
    .ip2hdm_aximm1_rready    ( ip2hdm_aximm1_rready  )  ,
 
-    // GPU CSR via CAFU AVMM
-   .gpu_avmm_clk            ( ip2cafu_avmm_clk         ),
-   .gpu_avmm_rstn           ( ip2cafu_avmm_rstn        ),
-   .gpu_avmm_address        ( ip2cafu_avmm_address      ),
-   .gpu_avmm_writedata      ( ip2cafu_avmm_writedata    ),
-   .gpu_avmm_write          ( gpu_avmm_write_gated      ),
-   .gpu_avmm_read           ( gpu_avmm_read_gated       ),
-   .gpu_avmm_byteenable     ( ip2cafu_avmm_byteenable   ),
+    // GPU CSR via PIO bridge (400MHz direct path, BAR0+0x080000)
+   .gpu_avmm_clk            ( ip2hdm_clk                ),
+   .gpu_avmm_rstn           ( ip2hdm_reset_n            ),
+   .gpu_avmm_address        ( pio_csr_avmm_address      ),
+   .gpu_avmm_writedata      ( pio_csr_avmm_writedata    ),
+   .gpu_avmm_write          ( pio_gpu_write              ),
+   .gpu_avmm_read           ( pio_gpu_read               ),
+   .gpu_avmm_byteenable     ( pio_csr_avmm_byteenable   ),
    .gpu_avmm_waitrequest    ( gpu_avmm_waitrequest       ),
    .gpu_avmm_readdata       ( gpu_avmm_readdata          ),
    .gpu_avmm_readdatavalid  ( gpu_avmm_readdatavalid     ),
