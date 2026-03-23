@@ -288,8 +288,7 @@ module vortex_gpu_wrapper
             dcr_wr_addr <= '0;
             dcr_wr_data <= '0;
         end else begin
-            // Default pulse signals
-            csr_ready <= 1'b0;
+            // FIX: csr_ready is level-based (not pulse), only clear when handshake completes
             vx_launch_trigger <= 1'b0;
             kernel_done <= 1'b0;
             dcr_wr_valid <= 1'b0;
@@ -297,7 +296,10 @@ module vortex_gpu_wrapper
             //=================================================================
             // CSR Interface Handling
             //=================================================================
+            // FIX: Check if NOT ready before asserting (level-based handshake)
+            // Handle CSR handshake
             if (csr_valid && !csr_ready) begin
+                // New request arriving
                 csr_ready <= 1'b1;
 
                 if (csr_write) begin
@@ -341,6 +343,9 @@ module vortex_gpu_wrapper
                         default:            csr_rdata <= 64'h0;
                     endcase
                 end
+            end else if (!csr_valid && csr_ready) begin
+                // Request completed or csr_valid deasserted - clear ready
+                csr_ready <= 1'b0;
             end
 
             //=================================================================
