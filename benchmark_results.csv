@@ -1,0 +1,5 @@
+Workload,CPU_ms,FPGA_ms,Speedup,Status
+Graph Neural Networks,0.46,111.50,0.00,success
+B-Tree,0.00,0.66,0.00,success
+Bioinformatics,0.29,0.01,54.24,success
+Recommender Systems,9.35,0.55,17.02,success
