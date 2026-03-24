@@ -1,0 +1,67 @@
+================================================
+Comprehensive Type2 Snoop Path Testing
+CXL Type2 Device Coherency Analysis
+================================================
+
+========================================
+Test 1: Snoop Latency Measurement
+========================================
+Baseline: CPU directly writes to target
+  Direct write latency: 124.0 ns
+Snoop test: Write then read with delay
+  Snoop read latency statistics:
+    Min:  386.0 ns
+    Avg:  432.3 ns
+    P50:  411.0 ns
+    P99:  601.0 ns
+    Max:  601.0 ns
+
+========================================
+Test 2: Snoop Bandwidth Measurement
+========================================
+Sequential 64-byte writes (GPU→Host via snoop)
+  Time: 0.038 ms
+  Bandwidth: 0.22 GB/s
+Random access (cache line granularity)
+  Time: 0.053 ms
+  Bandwidth: 0.16 GB/s
+
+========================================
+Test 3: Cache Coherency Verification
+========================================
+Testing coherency with 4 CPU threads
+  Multi-threaded coherency: PASS (no detected issues)
+
+========================================
+Test 4: Snoop Request Type Analysis
+========================================
+Tracking different snoop operations:
+
+1. Cache miss read (should trigger snoop):
+   Latency: 131.0 ns
+2. Cache-modifying write:
+   Write latency: 109.0 ns
+3. Atomic compare-and-swap (strongest snoop):
+   Atomic latency: 109.0 ns
+4. Cache line prefetch (triggers snoop path)
+   Prefetch latency: 270.0 ns
+
+========================================
+Test 5: CXL Type2 Snoop Path Verification
+========================================
+CXL Device Memory Snoop Characteristics:
+
+1. GPU→Host snoop path (data visibility):
+   Written: 0xA5A5A5A5A5A5A5A5
+   Read back: 0xa5a5a5a5a5a5a5a5
+   Coherency: ✓ PASS
+2. Snoop invalidation latency:
+   Min invalidation: 66.0 ns
+   Max invalidation: 465.0 ns
+   Median: 71.0 ns
+3. Memory ordering through snoop:
+   Release/acquire ordering: ✓ PASS
+
+================================================
+All snoop tests completed
+================================================

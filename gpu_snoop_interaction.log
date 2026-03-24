@@ -1,0 +1,78 @@
+================================================
+GPU↔Type2 Snoop Interaction Analysis
+Detailed Coherency Path Testing
+================================================
+
+========================================
+Test 1: GPU Write → Snoop Invalidation
+========================================
+GPU updates shared data, CPU reads back:
+(Measures snoop invalidation + cache miss latency)
+
+Snoop invalidation latencies:
+  Min:    409 ns
+  P25:    484 ns
+  Median: 495 ns
+  P75:    500 ns
+  P99:    675 ns
+  Max:    675 ns
+
+Estimated pure snoop latency: 445 ns
+
+========================================
+Test 2: Snoop Cache Line Bandwidth
+========================================
+GPU snoops multiple cache lines:
+  Testing 64 cache lines (4KB)
+
+Sequential snoop throughput:
+  Total time:        3.546 us
+  Per cache line:    55.4 ns
+  Bandwidth:         1.16 GB/s
+
+Interleaved snoop throughput:
+  Total time:        3.885 us
+  Bandwidth:         1.05 GB/s
+
+========================================
+Test 3: Snoop-Induced False Sharing
+========================================
+CPU and GPU updating adjacent data in same cache line:
+(Snoop invalidation causes cache line bouncing)
+
+Cache line bounce latencies (false sharing):
+  Min:    476 ns
+  Median: 485 ns
+  Max:    599 ns
+
+Note: High latencies indicate snoop-induced cache bouncing
+
+========================================
+Test 4: DCOH Completion Signaling
+========================================
+Measuring GPU→Host completion signaling via DCOH:
+(GPU writes completion magic, CPU polls for update)
+
+DCOH completion signaling latencies:
+  Min:    490 ns
+  P50:    500 ns
+  P99:    690 ns
+  Max:    690 ns
+
+========================================
+Test 5: Snoop Protocol State Analysis
+========================================
+CXL Type2 Snoop State Transitions:
+
+1. CPU Reads (I→S transition via snoop):
+   Latency: 90 ns
+2. CPU Write (S→M transition, snoop invalidates GPU copy):
+   Latency: 94 ns
+3. GPU Write (M→I+M, snoop to other agents):
+   Latency: 90 ns
+
+Note: MESI/MOESI protocol state changes involve snoop traffic
+
+================================================
+Snoop interaction analysis complete
+================================================

@@ -1,0 +1,54 @@
+Info: *******************************************************************
+Info: Running Quartus Prime Shell
+    Info: Version 25.1.0 Build 129 03/26/2025 SC Pro Edition
+    Info: Copyright (C) 2025  Altera Corporation. All rights reserved.
+    Info: Your use of Altera Corporation's design tools, logic functions 
+    Info: and other software and tools, and any partner logic 
+    Info: functions, and any output files from any of the foregoing 
+    Info: (including device programming or simulation files), and any 
+    Info: associated documentation or information are expressly subject 
+    Info: to the terms and conditions of the Altera Program License 
+    Info: Subscription Agreement, the Altera Quartus Prime License Agreement,
+    Info: the Altera IP License Agreement, or other applicable license
+    Info: agreement, including, without limitation, that your use is for
+    Info: the sole purpose of programming logic devices manufactured by
+    Info: Altera and sold by Altera or its authorized distributors.  Please
+    Info: refer to the Altera Software License Subscription Agreements 
+    Info: on the Quartus Prime software download page.
+    Info: Processing started: Sun Mar 22 21:42:37 2026
+    Info: System process ID: 12644
+Info: Command: quartus_sh -t cxltyp2_ed.tcl
+Error (23018): Tcl Script File cxltyp2_ed.tcl not found
+Error (23031): Evaluation of Tcl script cxltyp2_ed.tcl unsuccessful
+Error: Quartus Prime Shell was unsuccessful. 2 errors, 0 warnings
+    Error: Peak virtual memory: 1345 megabytes
+    Error: Processing ended: Sun Mar 22 21:42:38 2026
+    Error: Elapsed time: 00:00:01
+    Error: System process ID: 12644
+Info: *******************************************************************
+Info: Running Quartus Prime Shell
+    Info: Version 25.1.0 Build 129 03/26/2025 SC Pro Edition
+    Info: Copyright (C) 2025  Altera Corporation. All rights reserved.
+    Info: Your use of Altera Corporation's design tools, logic functions 
+    Info: and other software and tools, and any partner logic 
+    Info: functions, and any output files from any of the foregoing 
+    Info: (including device programming or simulation files), and any 
+    Info: associated documentation or information are expressly subject 
+    Info: to the terms and conditions of the Altera Program License 
+    Info: Subscription Agreement, the Altera Quartus Prime License Agreement,
+    Info: the Altera IP License Agreement, or other applicable license
+    Info: agreement, including, without limitation, that your use is for
+    Info: the sole purpose of programming logic devices manufactured by
+    Info: Altera and sold by Altera or its authorized distributors.  Please
+    Info: refer to the Altera Software License Subscription Agreements 
+    Info: on the Quartus Prime software download page.
+    Info: Processing started: Sun Mar 22 21:42:53 2026
+    Info: System process ID: 12826
+Info: Command: quartus_sh -t -
+Error (23018): Tcl Script File - not found
+Error (23031): Evaluation of Tcl script - unsuccessful
+Error: Quartus Prime Shell was unsuccessful. 2 errors, 0 warnings
+    Error: Peak virtual memory: 1345 megabytes
+    Error: Processing ended: Sun Mar 22 21:42:53 2026
+    Error: Elapsed time: 00:00:00
+    Error: System process ID: 12826
