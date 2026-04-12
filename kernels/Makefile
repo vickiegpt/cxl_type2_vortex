@@ -1,18 +1,18 @@
 # =============================================================================
-# Makefile — Vortex GPU GEMM kernel cross-compilation
+# Makefile — Vortex GPU kernel cross-compilation
 #
 # Builds RV64 kernel binaries for the Vortex SIMT processor.
 #
 # Targets:
-#   all           Build gemm_kernel.elf + .bin (default)
-#   asm           Build from hand-optimized assembly (gemm_kernel.S)
-#   dump          Generate disassembly listing
-#   hex           Generate hex dump
+#   all           Build gemm_kernel + spmv_kernel .elf/.bin (default)
+#   gemm          Build only GEMM kernel
+#   spmv          Build only SpMV kernel
+#   dump          Generate disassembly listings
 #   clean         Remove build artifacts
 #
 # Usage:
-#   make                      # Build C kernel (default)
-#   make KERNEL_SRC=asm       # Build assembly kernel
+#   make                      # Build all kernels
+#   make spmv                 # Build SpMV kernel only
 #   make CROSS_COMPILE=riscv64-linux-gnu-   # Use Linux toolchain
 # =============================================================================
 
@@ -50,36 +50,28 @@ ASFLAGS = $(MARCH) -nostdlib -nostartfiles -ffreestanding -I.
 LDFLAGS = $(MARCH) -nostdlib -nostartfiles -T linker.ld \
           -Wl,--gc-sections -Wl,--print-memory-usage
 
-# Output names
-TARGET  = gemm_kernel
-
-# Source selection: 'c' (default) or 'asm'
-KERNEL_SRC ?= c
-
-ifeq ($(KERNEL_SRC),asm)
-    KERNEL_OBJ = gemm_kernel_asm.o
-else
-    KERNEL_OBJ = gemm_kernel.o
-endif
-
-OBJECTS = crt0.o $(KERNEL_OBJ)
-
 # =============================================================================
 # Targets
 # =============================================================================
 
-.PHONY: all asm dump hex clean check-toolchain info
+.PHONY: all gemm spmv prefetch_chain prefetch_hash prefetch_stream prefetch_all asm dump clean check-toolchain info
 
-all: check-toolchain $(TARGET).bin $(TARGET).hex
+all: check-toolchain gemm spmv prefetch_all
+
+gemm: check-toolchain gemm_kernel.bin gemm_kernel.hex
 	@echo ""
-	@echo "Build complete:"
-	@echo "  $(TARGET).elf  — Linked ELF binary"
-	@echo "  $(TARGET).bin  — Raw binary (load at 0x80000000)"
-	@echo "  $(TARGET).hex  — Hex dump"
-	@$(SIZE) $(TARGET).elf
+	@echo "GEMM build complete:"
+	@echo "  gemm_kernel.bin  — Raw binary (load at 0x80000000)"
+	@$(SIZE) gemm_kernel.elf
+
+spmv: check-toolchain spmv_kernel.bin spmv_kernel.hex
+	@echo ""
+	@echo "SpMV build complete:"
+	@echo "  spmv_kernel.bin  — Raw binary (load at 0x80000000)"
+	@$(SIZE) spmv_kernel.elf
 
 asm:
-	$(MAKE) KERNEL_SRC=asm
+	$(MAKE) KERNEL_SRC=asm gemm
 
 # Check that the cross-compiler is available
 check-toolchain:
@@ -95,45 +87,114 @@ check-toolchain:
 		exit 1; \
 	fi
 
-# Compile C kernel
+# =============================================================================
+# GEMM kernel
+# =============================================================================
+
 gemm_kernel.o: gemm_kernel.c vx_intrinsics.h gemm_args.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# Compile assembly kernel
 gemm_kernel_asm.o: gemm_kernel.S
 	$(AS) $(ASFLAGS) -c -o $@ $<
 
-# Compile CRT startup
+# =============================================================================
+# SpMV kernel
+# =============================================================================
+
+spmv_kernel.o: spmv_kernel.c vx_intrinsics.h spmv_args.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# =============================================================================
+# Prefetch kernels (CIRA)
+# =============================================================================
+
+prefetch_all: check-toolchain prefetch_chain prefetch_hash prefetch_stream
+
+prefetch_chain: check-toolchain prefetch_chain_kernel.bin prefetch_chain_kernel.hex
+	@echo ""
+	@echo "Prefetch Chain build complete:"
+	@$(SIZE) prefetch_chain_kernel.elf
+
+prefetch_hash: check-toolchain prefetch_hash_kernel.bin prefetch_hash_kernel.hex
+	@echo ""
+	@echo "Prefetch Hash build complete:"
+	@$(SIZE) prefetch_hash_kernel.elf
+
+prefetch_stream: check-toolchain prefetch_stream_kernel.bin prefetch_stream_kernel.hex
+	@echo ""
+	@echo "Prefetch Stream build complete:"
+	@$(SIZE) prefetch_stream_kernel.elf
+
+prefetch_chain_kernel.o: prefetch_chain_kernel.c vx_intrinsics.h prefetch_args.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+prefetch_hash_kernel.o: prefetch_hash_kernel.c vx_intrinsics.h prefetch_args.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+prefetch_stream_kernel.o: prefetch_stream_kernel.c vx_intrinsics.h prefetch_args.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+prefetch_chain_kernel.elf: crt0.o prefetch_chain_kernel.o linker.ld
+	$(LD) $(LDFLAGS) -o $@ crt0.o prefetch_chain_kernel.o
+
+prefetch_hash_kernel.elf: crt0.o prefetch_hash_kernel.o linker.ld
+	$(LD) $(LDFLAGS) -o $@ crt0.o prefetch_hash_kernel.o
+
+prefetch_stream_kernel.elf: crt0.o prefetch_stream_kernel.o linker.ld
+	$(LD) $(LDFLAGS) -o $@ crt0.o prefetch_stream_kernel.o
+
+# =============================================================================
+# Common: CRT startup
+# =============================================================================
+
 crt0.o: crt0.S
 	$(AS) $(ASFLAGS) -c -o $@ $<
 
-# Link ELF
-$(TARGET).elf: $(OBJECTS) linker.ld
-	$(LD) $(LDFLAGS) -o $@ $(OBJECTS)
+# =============================================================================
+# Linking
+# =============================================================================
 
-# Generate raw binary (stripped, loadable at 0x80000000)
-$(TARGET).bin: $(TARGET).elf
+# GEMM kernel source selection
+KERNEL_SRC ?= c
+ifeq ($(KERNEL_SRC),asm)
+    GEMM_OBJ = gemm_kernel_asm.o
+else
+    GEMM_OBJ = gemm_kernel.o
+endif
+
+gemm_kernel.elf: crt0.o $(GEMM_OBJ) linker.ld
+	$(LD) $(LDFLAGS) -o $@ crt0.o $(GEMM_OBJ)
+
+spmv_kernel.elf: crt0.o spmv_kernel.o linker.ld
+	$(LD) $(LDFLAGS) -o $@ crt0.o spmv_kernel.o
+
+# =============================================================================
+# Binary generation
+# =============================================================================
+
+%.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
 	@echo "Binary size: $$(wc -c < $@) bytes"
 
-# Generate Intel HEX
-$(TARGET).hex: $(TARGET).elf
+%.hex: %.elf
 	$(OBJCOPY) -O ihex $< $@
 
-# Disassembly listing
-dump: $(TARGET).elf
-	$(OBJDUMP) -d -M no-aliases -S $< > $(TARGET).dump
-	@echo "Disassembly written to $(TARGET).dump"
-	@echo "--- First 80 lines ---"
-	@head -80 $(TARGET).dump
+# =============================================================================
+# Debugging
+# =============================================================================
 
-# Print build info
+dump: gemm_kernel.elf spmv_kernel.elf prefetch_chain_kernel.elf prefetch_hash_kernel.elf prefetch_stream_kernel.elf
+	$(OBJDUMP) -d -M no-aliases -S gemm_kernel.elf > gemm_kernel.dump
+	$(OBJDUMP) -d -M no-aliases -S spmv_kernel.elf > spmv_kernel.dump
+	$(OBJDUMP) -d -M no-aliases -S prefetch_chain_kernel.elf > prefetch_chain_kernel.dump
+	$(OBJDUMP) -d -M no-aliases -S prefetch_hash_kernel.elf > prefetch_hash_kernel.dump
+	$(OBJDUMP) -d -M no-aliases -S prefetch_stream_kernel.elf > prefetch_stream_kernel.dump
+	@echo "Disassembly written to *.dump"
+
 info:
 	@echo "Toolchain:    $(CC)"
 	@echo "Architecture: $(ARCH)"
 	@echo "ABI:          $(ABI)"
-	@echo "Kernel src:   $(KERNEL_SRC)"
-	@echo "Objects:      $(OBJECTS)"
 
 clean:
-	rm -f *.o $(TARGET).elf $(TARGET).bin $(TARGET).hex $(TARGET).dump
+	rm -f *.o *.elf *.bin *.hex *.dump
