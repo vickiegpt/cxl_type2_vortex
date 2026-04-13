@@ -1,33 +1,48 @@
 #!/bin/bash
-# run_benchmarks.sh — Run all CIRA benchmarks and produce eval-commands.tex
+# run_benchmarks.sh — Run all CIRA benchmarks (real hardware only)
 #
 # Usage:
-#   ./run_benchmarks.sh [--hardware]    # default: --simulate
+#   sudo ./run_benchmarks.sh [--iterations N] [--arcs N] [--depth N]
+#
+# Requires: root for /dev/mem BAR0 access
 #
 # Output:
-#   results/benchmark_results.json
-#   ../eval-commands.tex (updated with real data)
+#   results/mcf_results.txt
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
-MODE="--simulate"
-if [[ "${1:-}" == "--hardware" ]]; then
-    MODE="--hardware"
-    echo "Running in HARDWARE mode (requires sudo for /dev/mem access)"
+ITERATIONS="${ITERATIONS:-1000}"
+ARCS="${ARCS:-100000}"
+DEPTH="${DEPTH:-16}"
+
+# Parse overrides
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --iterations) ITERATIONS="$2"; shift 2 ;;
+        --arcs)       ARCS="$2";       shift 2 ;;
+        --depth)      DEPTH="$2";      shift 2 ;;
+        *)            echo "Unknown arg: $1"; exit 1 ;;
+    esac
+done
+
+if [[ $EUID -ne 0 ]]; then
+    echo "ERROR: Must run as root (need /dev/mem access for BAR0)"
+    exit 1
 fi
 
 mkdir -p results
 
 echo "================================================================"
-echo "CIRA Benchmark Suite"
-echo "Mode: ${MODE}"
+echo "CIRA Benchmark Suite (Hardware)"
 echo "Date: $(date -Iseconds)"
+echo "Host: $(hostname)"
+echo "Kernel: $(uname -r)"
 echo "================================================================"
 
 echo ""
 echo "--- MCF ---"
-./mcf_cira ${MODE} --iterations 1000 --arcs 100000 --depth 16 \
+./mcf_cira --iterations "${ITERATIONS}" --arcs "${ARCS}" --depth "${DEPTH}" \
     | tee results/mcf_results.txt
 
 echo ""

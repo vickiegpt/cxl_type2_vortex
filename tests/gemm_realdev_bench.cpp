@@ -119,7 +119,9 @@ std::unique_ptr<uint8_t[]> load_kernel(const char* path, size_t& size) {
 
 // Run GEMM on real GPU with DCOH completion verification
 bool run_gemm_benchmark(DeviceMemoryMap& dev,
-                        uint32_t M, uint32_t N, uint32_t K) {
+                        uint32_t M, uint32_t N, uint32_t K,
+                        const std::unique_ptr<uint8_t[]>& kernel_binary,
+                        size_t kernel_size) {
     printf("\n=== GEMM %ux%ux%u ===\n", M, N, K);
 
     if (!dev.is_valid()) {
@@ -127,40 +129,55 @@ bool run_gemm_benchmark(DeviceMemoryMap& dev,
         return false;
     }
 
-    // Allocate host memory for matrices (use posix_memalign for alignment)
+    if (!kernel_binary || kernel_size == 0) {
+        printf("ERROR: Kernel binary not loaded\n");
+        return false;
+    }
+
+    // Allocate host memory for matrices + kernel (use posix_memalign for alignment)
+    size_t kernel_offset = 0;  // Kernel code at start
+    size_t kernel_aligned = (kernel_size + 4095) & ~4095;  // Align to 4KB
+
     size_t Asize = M * K * sizeof(float);
     size_t Bsize = K * N * sizeof(float);
     size_t Csize = M * N * sizeof(float);
     size_t args_size = 256; // Extra padding
     size_t comp_size = 256;
 
-    void* A_ptr = nullptr, *B_ptr = nullptr, *C_ptr = nullptr;
-    void* args_ptr = nullptr, *comp_ptr = nullptr;
+    size_t A_offset = kernel_aligned;
+    size_t B_offset = A_offset + Asize;
+    size_t C_offset = B_offset + Bsize;
+    size_t args_offset = C_offset + Csize;
+    size_t comp_offset = args_offset + args_size;
+    size_t total_size = comp_offset + comp_size;
 
-    if (posix_memalign(&A_ptr, 64, Asize) ||
-        posix_memalign(&B_ptr, 64, Bsize) ||
-        posix_memalign(&C_ptr, 64, Csize) ||
-        posix_memalign(&args_ptr, 64, args_size) ||
-        posix_memalign(&comp_ptr, 64, comp_size)) {
+    void* buf = nullptr;
+    if (posix_memalign(&buf, 4096, total_size)) {
         perror("posix_memalign");
         return false;
     }
 
-    float* A = (float*)A_ptr;
-    float* B = (float*)B_ptr;
-    float* C = (float*)C_ptr;
-    GemmKernelArgs* args = (GemmKernelArgs*)args_ptr;
-    CompletionData* comp = (CompletionData*)comp_ptr;
+    // Copy kernel binary to beginning of allocation
+    memcpy((uint8_t*)buf + kernel_offset, kernel_binary.get(), kernel_size);
+    printf("[Kernel] Loaded %zu bytes at memory offset 0x%zx (GPU address 0x80000000)\n",
+           kernel_size, kernel_offset);
+
+    float* A = (float*)((uint8_t*)buf + A_offset);
+    float* B = (float*)((uint8_t*)buf + B_offset);
+    float* C = (float*)((uint8_t*)buf + C_offset);
+    GemmKernelArgs* args = (GemmKernelArgs*)((uint8_t*)buf + args_offset);
+    CompletionData* comp = (CompletionData*)((uint8_t*)buf + comp_offset);
 
     // Initialize matrices
     for (uint32_t i = 0; i < M * K; i++) A[i] = 1.0f + (i % 10) * 0.1f;
     for (uint32_t i = 0; i < K * N; i++) B[i] = 2.0f + (i % 10) * 0.1f;
     for (uint32_t i = 0; i < M * N; i++) C[i] = 0.0f;
 
-    // Setup kernel arguments (use physical addresses or offsets from A base)
-    args->A_addr = 0;  // A is at base
-    args->B_addr = Asize;  // B follows A
-    args->C_addr = Asize + Bsize;  // C follows B
+    // Setup kernel arguments (use offsets from coherent memory base)
+    // GPU virtual address base: 0x80000000
+    args->A_addr = 0x80000000 + A_offset;  // A at kernel_base + A_offset
+    args->B_addr = 0x80000000 + B_offset;  // B at kernel_base + B_offset
+    args->C_addr = 0x80000000 + C_offset;  // C at kernel_base + C_offset
     args->M = M;
     args->N = N;
     args->K = K;
@@ -169,14 +186,13 @@ bool run_gemm_benchmark(DeviceMemoryMap& dev,
     args->ldc = N;
     args->alpha = 1.0f;
     args->beta = 0.0f;
-    args->completion_addr = (uintptr_t)comp_ptr;  // Physical address of completion
+    args->completion_addr = 0x80000000 + comp_offset;  // GPU virtual address of completion
 
     memset(comp, 0, sizeof(*comp));
 
     // Cleanup helper
     auto cleanup = [&]() {
-        free(A_ptr); free(B_ptr); free(C_ptr);
-        free(args_ptr); free(comp_ptr);
+        free(buf);
     };
 
     // Wait for GPU to be idle
@@ -195,13 +211,15 @@ bool run_gemm_benchmark(DeviceMemoryMap& dev,
     // Launch kernel
     printf("Launching kernel...\n");
 
-    // Set kernel address (load address in GPU memory, using base 0x80000000)
+    // Set kernel address (kernel is at GPU virtual address 0x80000000)
     dev.csr_write(KERNEL_ADDR_LO, 0x80000000);
     dev.csr_write(KERNEL_ADDR_HI, 0x00000000);
 
-    // Set arguments address
-    dev.csr_write(KERNEL_ARGS_LO, (uint32_t)(uintptr_t)args);
-    dev.csr_write(KERNEL_ARGS_HI, (uint32_t)(((uintptr_t)args) >> 32));
+    // Set arguments address (args are in coherent memory at 0x80000000 + args_offset)
+    uint32_t args_addr_lo = 0x80000000 + args_offset;
+    uint32_t args_addr_hi = 0x00000000;
+    dev.csr_write(KERNEL_ARGS_LO, args_addr_lo);
+    dev.csr_write(KERNEL_ARGS_HI, args_addr_hi);
 
     // Set grid dimensions (1D: gridX threads, gridY=1)
     uint32_t threads_per_block = 32;
@@ -306,10 +324,19 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Load GPU kernel binary
+    size_t kernel_size = 0;
+    auto kernel_binary = load_kernel("../kernels/gemm_kernel.bin", kernel_size);
+    if (!kernel_binary || kernel_size == 0) {
+        fprintf(stderr, "Failed to load kernel binary\n");
+        return 1;
+    }
+    printf("[Main] Kernel binary loaded: %zu bytes\n", kernel_size);
+
     // Test different matrix sizes
     uint32_t dims[] = {32, 64, 128, 256};
     for (uint32_t dim : dims) {
-        if (!run_gemm_benchmark(dev, dim, dim, dim)) {
+        if (!run_gemm_benchmark(dev, dim, dim, dim, kernel_binary, kernel_size)) {
             fprintf(stderr, "GEMM %ux%ux%u failed\n", dim, dim, dim);
         }
     }

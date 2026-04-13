@@ -526,6 +526,17 @@ import cxl_memuring_vortex_pkg::*;
 , input ip2hdm_clk
 , input ip2hdm_reset_n
 , input [31:0] read_delay
+
+// GPU status outputs (ip2hdm_clk domain, exported for host CSR via CDC)
+, output logic [7:0]  gpu_status_out
+, output logic [63:0] gpu_cycles_out
+, output logic [63:0] gpu_instrs_out
+
+// GPU launch toggle from ed_top_wrapper (pulse-to-toggle in ip2csr_avmm_clk 125 MHz)
+// Safe to 2-FF sync into ip2hdm_clk (400 MHz) — toggle is level-based.
+, input  logic        ext_vx_launch_toggle
+, input  logic [63:0] ext_vx_kernel_addr
+, input  logic [63:0] ext_vx_kernel_args
 );
 
 
@@ -868,9 +879,72 @@ logic [31:0] gpu_kernel_status;
 
 vortex_perf_counters_t gpu_perf_counters;
 
-// Dummy kernel launch interface (not used - CSR-driven launch)
-vortex_kernel_args_t   dummy_kernel_args;
-assign dummy_kernel_args = '0;
+// GPU status output signals (from vortex_gpu_wrapper)
+logic [7:0]  gpu_status_internal;
+logic [63:0] gpu_cycles_internal;
+logic [63:0] gpu_instrs_internal;
+logic        gpu_kernel_launch_ready_int;
+
+// Export GPU status to ed_top_wrapper_typ2
+assign gpu_status_out = gpu_status_internal;
+assign gpu_cycles_out = gpu_cycles_internal;
+assign gpu_instrs_out = gpu_instrs_internal;
+
+//=========================================================================
+// CDC: External launch toggle (125 MHz) -> GPU clock domain (ip2hdm_clk)
+// Toggle-based pulse synchronizer:
+//   Stage 1 (pulse -> toggle) is done in ed_top_wrapper_typ2.sv
+//           in ip2csr_avmm_clk (125 MHz) domain.
+//   Stage 2: 2-FF sync of toggle into ip2hdm_clk (400 MHz)
+//   Stage 3: XOR edge-detect on synced toggle -> single-cycle pulse
+//=========================================================================
+
+(* preserve *) logic ext_toggle_s1, ext_toggle_s2, ext_toggle_s_prev;
+logic ext_launch_pulse;
+
+always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n) begin
+    if (!ip2hdm_reset_n) begin
+        ext_toggle_s1     <= 1'b0;
+        ext_toggle_s2     <= 1'b0;
+        ext_toggle_s_prev <= 1'b0;
+    end else begin
+        ext_toggle_s1     <= ext_vx_launch_toggle;  // metastability resolve
+        ext_toggle_s2     <= ext_toggle_s1;          // stable sample
+        ext_toggle_s_prev <= ext_toggle_s2;          // for edge detect
+    end
+end
+
+// Any toggle transition = one launch pulse in ip2hdm_clk domain
+assign ext_launch_pulse = (ext_toggle_s2 ^ ext_toggle_s_prev);
+
+// Latch external kernel config and generate launch via kernel_launch interface
+logic ext_launch_pending;
+vortex_kernel_args_t ext_kernel_args;
+
+always_ff @(posedge ip2hdm_clk or negedge ip2hdm_reset_n) begin
+    if (!ip2hdm_reset_n) begin
+        ext_launch_pending <= 1'b0;
+        ext_kernel_args    <= '0;
+    end else begin
+        if (ext_launch_pulse && !ext_launch_pending) begin
+            ext_launch_pending           <= 1'b1;
+            ext_kernel_args.pc_start     <= ext_vx_kernel_addr;
+            ext_kernel_args.kernel_param_ptr <= ext_vx_kernel_args;
+            // Single workgroup: all SIMT threads participate within 1x1x1 grid.
+            // The Vortex runtime expects grid/block = 1; thread distribution is
+            // handled by hardware (warps * threads_per_warp).
+            ext_kernel_args.grid_x       <= 16'h1;
+            ext_kernel_args.grid_y       <= 16'h1;
+            ext_kernel_args.grid_z       <= 16'h1;
+            ext_kernel_args.block_x      <= 16'h1;
+            ext_kernel_args.block_y      <= 16'h1;
+            ext_kernel_args.block_z      <= 16'h1;
+        end
+        if (ext_launch_pending && gpu_kernel_launch_ready_int) begin
+            ext_launch_pending <= 1'b0;
+        end
+    end
+end
 
 //=========================================================================
 // AVMM-to-CSR Bridge: CAFU AVMM (125 MHz) -> GPU CSR (400 MHz ip2hdm_clk)
@@ -1088,14 +1162,19 @@ vortex_gpu_wrapper vortex_gpu_inst (
     .csr_rdata              (gpu_csr_rdata),
 
     // Kernel launch interface (unused - using CSR-driven launch)
-    .kernel_launch_valid    (1'b0),
-    .kernel_args            (dummy_kernel_args),
-    .kernel_launch_ready    (),
+    .kernel_launch_valid    (ext_launch_pending),
+    .kernel_args            (ext_kernel_args),
+    .kernel_launch_ready    (gpu_kernel_launch_ready_int),
     .kernel_done            (gpu_kernel_done),
     .kernel_status          (gpu_kernel_status),
 
     // Performance counters
     .perf_counters          (gpu_perf_counters),
+
+    // Status outputs (for CDC export to host CSR domain)
+    .status_out             (gpu_status_internal),
+    .cycles_out             (gpu_cycles_internal),
+    .instrs_out             (gpu_instrs_internal),
 
     // AXI Port 0 (Host Memory) - unused, tied off inside wrapper
     .m_axi_port0_awid       (),

@@ -40,6 +40,11 @@ module vortex_gpu_wrapper
     // Performance counter output
     output vortex_perf_counters_t perf_counters,
 
+    // Continuous status outputs (for CDC export to host CSR domain)
+    output logic [7:0]  status_out,        // reg_status (IDLE/RUNNING/DONE/ERROR)
+    output logic [63:0] cycles_out,        // reg_cycles (frozen after completion)
+    output logic [63:0] instrs_out,        // reg_instrs
+
     // AXI4-MM Master Port 0 (Host Memory via CAFU Port0)
     output logic [3:0]   m_axi_port0_awid,
     output logic [63:0]  m_axi_port0_awaddr,
@@ -636,5 +641,13 @@ module vortex_gpu_wrapper
             end
         end
     end
+
+    //=========================================================================
+    // Status Output Assignments (for host CSR domain via CDC)
+    //=========================================================================
+
+    assign status_out = reg_status;
+    assign cycles_out = reg_cycles;
+    assign instrs_out = reg_instrs;
 
 endmodule

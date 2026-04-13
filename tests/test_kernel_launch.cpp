@@ -268,12 +268,12 @@ public:
         auto start = std::chrono::steady_clock::now();
 
         // Simulate mwait behavior
+        __monitor(comp, 0, 0);  // ARM monitor on cache line
         while (true) {
             // In real code, this would be:
-            // __monitor(comp, 0, 0);  // ARM monitor on cache line
-            // if (comp->magic != COMPLETION_MAGIC) {
-            //     __mwait(0, 0);  // Wait for cache line invalidation
-            // }
+            if (comp->magic != COMPLETION_MAGIC) {
+                __mwait(0, 0);  // Wait for cache line invalidation
+            }
 
             // Check for completion
             if (comp->magic == COMPLETION_MAGIC) {
@@ -283,6 +283,7 @@ public:
                 printf("  Result:    0x%016lX\n", comp->result);
                 printf("  Cycles:    %lu\n", comp->cycles);
                 printf("  Timestamp: %lu\n", comp->timestamp);
+                printf("  Address:   %p\n", ((int64_t*)comp)+8);
                 return comp->status;
             }
 

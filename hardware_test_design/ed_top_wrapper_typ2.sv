@@ -2478,50 +2478,51 @@ wire [31:0] vx_block_dim_x;
 wire [31:0] vx_block_dim_y;
 wire [31:0] vx_block_dim_z;
 
-// Vortex GPU status — when GPU core is not instantiated, report IDLE
+// Real GPU status from vortex_gpu_wrapper (via afu_top, ip2hdm_clk domain)
+logic [7:0]  gpu_status_from_afu;
+logic [63:0] gpu_cycles_from_afu;
+logic [63:0] gpu_instrs_from_afu;
+
+// CDC: Launch trigger pulse (ip2csr_avmm_clk 125 MHz) -> toggle for afu_top.
+// vx_launch_trigger is a single-cycle pulse from ex_default_csr_top.
+// Convert to a toggle here so afu_top can safely 2-FF sync + edge-detect it
+// in the ip2hdm_clk (400 MHz) domain.
+logic vx_launch_toggle;
+
+always_ff @(posedge ip2csr_avmm_clk or negedge ip2csr_avmm_rstn) begin
+    if (!ip2csr_avmm_rstn)
+        vx_launch_toggle <= 1'b0;
+    else if (vx_launch_trigger)
+        vx_launch_toggle <= ~vx_launch_toggle;
+end
+
+// CDC: GPU status (ip2hdm_clk ~400 MHz) -> CSR domain (ip2csr_avmm_clk 125 MHz)
+// Status is quasi-static (changes on kernel launch/completion), 2-FF sync is safe.
+// Cycle/instruction counters are frozen after kernel completion, so they are
+// stable when the host reads them (host polls STATUS=DONE first).
 logic [7:0]  vx_status_r;
 logic [63:0] vx_cycles_r;
 logic [63:0] vx_instrs_r;
 
-// Simple cycle counter for testing (counts while status == RUNNING)
-localparam [7:0] VX_STATUS_IDLE    = 8'h00;
-localparam [7:0] VX_STATUS_RUNNING = 8'h01;
-localparam [7:0] VX_STATUS_DONE    = 8'h02;
+logic [7:0]  gpu_status_sync1;
+logic [63:0] gpu_cycles_sync1;
+logic [63:0] gpu_instrs_sync1;
 
-// GPU status FSM — runs in CSR clock domain (ip2csr_avmm_clk, 125 MHz)
-// so that vx_launch_trigger (output of CSR) and vx_status_r (input to CSR)
-// are in the same clock domain with no CDC required.
 always_ff @(posedge ip2csr_avmm_clk or negedge ip2csr_avmm_rstn) begin
     if (!ip2csr_avmm_rstn) begin
-        vx_status_r <= VX_STATUS_IDLE;
-        vx_cycles_r <= 64'h0;
-        vx_instrs_r <= 64'h0;
+        gpu_status_sync1 <= 8'h00;
+        vx_status_r      <= 8'h00;
+        gpu_cycles_sync1 <= 64'h0;
+        vx_cycles_r      <= 64'h0;
+        gpu_instrs_sync1 <= 64'h0;
+        vx_instrs_r      <= 64'h0;
     end else begin
-        case (vx_status_r)
-            VX_STATUS_IDLE: begin
-                if (vx_launch_trigger) begin
-                    vx_status_r <= VX_STATUS_RUNNING;
-                    vx_cycles_r <= 64'h0;
-                    vx_instrs_r <= 64'h0;
-                end
-            end
-            VX_STATUS_RUNNING: begin
-                vx_cycles_r <= vx_cycles_r + 1;
-                // Auto-complete after 1024 cycles (placeholder until real GPU core)
-                if (vx_cycles_r >= 64'd1024) begin
-                    vx_status_r <= VX_STATUS_DONE;
-                end
-            end
-            VX_STATUS_DONE: begin
-                // Stay DONE until next launch
-                if (vx_launch_trigger) begin
-                    vx_status_r <= VX_STATUS_RUNNING;
-                    vx_cycles_r <= 64'h0;
-                    vx_instrs_r <= 64'h0;
-                end
-            end
-            default: vx_status_r <= VX_STATUS_IDLE;
-        endcase
+        gpu_status_sync1 <= gpu_status_from_afu;
+        vx_status_r      <= gpu_status_sync1;
+        gpu_cycles_sync1 <= gpu_cycles_from_afu;
+        vx_cycles_r      <= gpu_cycles_sync1;
+        gpu_instrs_sync1 <= gpu_instrs_from_afu;
+        vx_instrs_r      <= gpu_instrs_sync1;
     end
 end
 
@@ -2805,6 +2806,17 @@ end
 ,   .ip2hdm_clk     (ip2hdm_clk)
 ,   .ip2hdm_reset_n (ip2hdm_reset_n_ff)
 ,   .read_delay     (read_delay)
+
+    // GPU status outputs (ip2hdm_clk domain -> CDC -> CSR domain)
+,   .gpu_status_out          (gpu_status_from_afu)
+,   .gpu_cycles_out          (gpu_cycles_from_afu)
+,   .gpu_instrs_out          (gpu_instrs_from_afu)
+
+    // GPU launch trigger — toggle-encoded for safe CDC into ip2hdm_clk inside afu_top.
+    // vx_launch_toggle is generated below from the CSR pulse in ip2csr_avmm_clk.
+,   .ext_vx_launch_toggle    (vx_launch_toggle)
+,   .ext_vx_kernel_addr      (vx_kernel_addr)
+,   .ext_vx_kernel_args      (vx_kernel_args)
 );
 
 

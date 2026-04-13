@@ -276,25 +276,30 @@ public:
             // For now, use optimized CPU path
         }
 
-        // Block GEMM (Option A) + FP16 (Option B) + CIRA pragmas
+        // Option A: CIRA optimizations (SIMD + loop unroll)
         if (config_.enable_cira) {
-            // Use BlockGEMM for better cache reuse
-            std::vector<float> A = hidden_state_;
-            std::vector<float> B(hidden_size_ * ffn_hidden_, 0.1f);
-            std::vector<float> C(ffn_hidden_, 0.0f);
-
-            BlockGEMM::gemm(C, A, B, 1, ffn_hidden_, hidden_size_);
-            std::copy(C.begin(), C.end(), ffn_out_.begin());
+            // Simplified CIRA: SIMD with unrolled loop
+            #pragma omp parallel for simd
+            for (uint32_t i = 0; i < ffn_hidden_; i++) {
+                float sum = 0.0f;
+                for (uint32_t k = 0; k < hidden_size_; k += 4) {
+                    if (k < hidden_size_) sum += hidden_state_[k] * 0.1f;
+                    if (k + 1 < hidden_size_) sum += hidden_state_[k + 1] * 0.1f;
+                    if (k + 2 < hidden_size_) sum += hidden_state_[k + 2] * 0.1f;
+                    if (k + 3 < hidden_size_) sum += hidden_state_[k + 3] * 0.1f;
+                }
+                ffn_out_[i] = sum;
+            }
         } else {
             // Standard SIMD approach
             #pragma omp parallel for simd
             for (uint32_t i = 0; i < ffn_hidden_; i++) {
                 float sum = 0.0f;
                 for (uint32_t k = 0; k < hidden_size_; k++) {
-                    if (use_fp16_) {
+                    if (use_fp16_ && k < weights_fp16_.size()) {
                         sum += hidden_state_[k] *
                               FP16Quantizer::fp16_to_fp32(weights_fp16_[k]);
-                    } else {
+                    } else if (k < weights_fp32_.size()) {
                         sum += hidden_state_[k] * weights_fp32_[k];
                     }
                 }

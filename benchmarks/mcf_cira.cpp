@@ -13,7 +13,7 @@
  *       ../runtime/cira_runtime.cpp -I../runtime -lpthread
  *
  * Usage:
- *   ./mcf_cira [--simulate] [--depth N] [--iterations N]
+ *   sudo ./mcf_cira [--depth N] [--iterations N] [--arcs N]
  */
 
 #include <cstdio>
@@ -24,6 +24,7 @@
 #include <vector>
 #include <numeric>
 #include "cira_runtime.h"
+#include "../kernels/prefetch_args.h"
 
 using namespace cira::runtime;
 
@@ -74,21 +75,21 @@ int64_t pricing_baseline(Arc* arc_list, uint32_t n_arcs) {
 // CIRA: pricing kernel with Vortex prefetch offloading
 int64_t pricing_cira(Arc* arc_list, uint32_t n_arcs,
                      CiraRuntime& rt, uint32_t depth) {
-    // Allocate LLC tile and future
-    CiraHandle buf = rt.alloc_cxl(depth * sizeof(Arc));
     CiraFuture f = rt.future_create(1);
 
+    // Build prefetch chain args for the Vortex kernel
+    PrefetchChainArgs args = {};
+    args.start_node = reinterpret_cast<uint64_t>(arc_list);
+    args.next_offset = offsetof(Arc, next);
+    args.data_offset = offsetof(Arc, cost);
+    args.data_size = sizeof(int64_t);
+    args.depth = depth;
+    args.output_buf = 0;  // Not used for prefetch-only mode
+    args.completion_addr = f.device_addr;
+    args.task_id = f.id;
+
     // Offload pointer-chase prefetching to Vortex
-    rt.offload(
-        reinterpret_cast<uint64_t>(arc_list),
-        FUNC_PREFETCH_CHAIN,
-        offsetof(Arc, next),     // next_offset
-        offsetof(Arc, cost),     // data_offset
-        sizeof(int64_t),         // data_size
-        0,                       // arg3 (unused)
-        depth,
-        &f
-    );
+    rt.offload(FUNC_PREFETCH_CHAIN, &args, sizeof(args), &f);
 
     // Host: consume data as Vortex delivers it
     int64_t min_cost = INT64_MAX;
@@ -105,7 +106,6 @@ int64_t pricing_cira(Arc* arc_list, uint32_t n_arcs,
     // Wait for Vortex to finish
     rt.future_await(f);
     rt.release(f);
-    rt.free_cxl(buf);
 
     return min_cost;
 }
@@ -119,15 +119,12 @@ void tree_update_work(uint32_t iterations) {
 }
 
 int main(int argc, char** argv) {
-    bool simulate = true;
     uint32_t depth = 16;
     uint32_t iterations = 1000;
     uint32_t n_arcs = 100000;
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--simulate") == 0) simulate = true;
-        else if (strcmp(argv[i], "--hardware") == 0) simulate = false;
-        else if (strcmp(argv[i], "--depth") == 0 && i + 1 < argc)
+        if (strcmp(argv[i], "--depth") == 0 && i + 1 < argc)
             depth = atoi(argv[++i]);
         else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc)
             iterations = atoi(argv[++i]);
@@ -136,31 +133,32 @@ int main(int argc, char** argv) {
     }
 
     printf("================================================================\n");
-    printf("MCF CIRA Benchmark\n");
+    printf("MCF CIRA Benchmark (Hardware Mode)\n");
     printf("  Arcs: %u, Depth: %u, Iterations: %u\n", n_arcs, depth, iterations);
-    printf("  Mode: %s\n", simulate ? "simulation" : "hardware");
     printf("================================================================\n\n");
 
     // Build random arc list
     auto arcs = build_random_arcs(n_arcs);
 
-    // Initialize CIRA runtime
+    // Initialize CIRA runtime (real hardware via BAR0 /dev/mem)
     CiraRuntime rt;
-    if (!rt.init("/dev/mem", 0xa2800000UL, 2 * 1024 * 1024, simulate)) {
-        fprintf(stderr, "Failed to initialize CIRA runtime\n");
+    if (!rt.init()) {
+        fprintf(stderr, "Failed to initialize CIRA runtime (need sudo)\n");
         return 1;
     }
 
-    // Load prefetch kernel (noop in simulation mode)
+    // Load prefetch kernel binary
     rt.load_kernel("../kernels/prefetch_chain_kernel.bin", FUNC_PREFETCH_CHAIN);
 
     // Warm up
-    pricing_baseline(&arcs[0], n_arcs);
+    volatile int64_t warmup = pricing_baseline(&arcs[0], n_arcs);
+    (void)warmup;
 
     // Baseline measurement
     auto t0 = std::chrono::high_resolution_clock::now();
     for (uint32_t i = 0; i < iterations; i++) {
-        pricing_baseline(&arcs[0], n_arcs);
+        volatile int64_t r = pricing_baseline(&arcs[0], n_arcs);
+        (void)r;
     }
     auto t1 = std::chrono::high_resolution_clock::now();
     double baseline_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
@@ -186,13 +184,7 @@ int main(int argc, char** argv) {
            cira_ms, cira_ms / iterations);
     printf("  Speedup:   %.2fx\n", speedup);
     printf("  Prefetch depth: %u\n", depth);
-    printf("  Mode:      %s\n", simulate ? "SIMULATED" : "HARDWARE");
     printf("\n");
-
-    if (simulate) {
-        printf("NOTE: Running in simulation mode. Speedup reflects overhead\n");
-        printf("of CIRA API calls only. Real hardware speedup expected: ~2.26x\n");
-    }
 
     return 0;
 }
