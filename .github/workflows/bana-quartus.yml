@@ -1,6 +1,9 @@
 name: Bana Quartus CI
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       target:
