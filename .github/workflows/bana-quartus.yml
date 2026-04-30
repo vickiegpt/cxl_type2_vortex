@@ -1,0 +1,106 @@
+name: Bana Quartus CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Remote target to run on bana
+        required: true
+        default: quartus
+        type: choice
+        options:
+          - quartus
+          - tests
+          - cpp
+          - gemm
+          - rtl
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bana-quartus-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bana:
+    name: Run on bana over SSH
+    runs-on: ubuntu-latest
+    timeout-minutes: 1440
+    env:
+      ALTERA_ROOT: /opt/alterapro_25.1
+      LM_LICENSE_FILE: /opt/altera_pro/25.1/lic_qsim_24_any.dat
+      BANA_WORK_ROOT: ${{ vars.BANA_WORK_ROOT || '/tmp/cxl_type2_vortex-actions' }}
+      BANA_SSH_TARGET: ${{ secrets.BANA_SSH_TARGET || vars.BANA_SSH_TARGET || 'bana' }}
+      TARGET: ${{ github.event.inputs.target || 'quartus' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure optional SSH key
+        env:
+          BANA_SSH_KEY: ${{ secrets.BANA_SSH_KEY }}
+          BANA_SSH_HOST: ${{ secrets.BANA_SSH_HOST || vars.BANA_SSH_HOST }}
+          BANA_SSH_USER: ${{ secrets.BANA_SSH_USER || vars.BANA_SSH_USER }}
+          BANA_KNOWN_HOSTS: ${{ secrets.BANA_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          if [[ -n "${BANA_KNOWN_HOSTS}" ]]; then
+            printf '%s\n' "${BANA_KNOWN_HOSTS}" >> ~/.ssh/known_hosts
+            chmod 600 ~/.ssh/known_hosts
+          fi
+
+          if [[ -n "${BANA_SSH_KEY}" ]]; then
+            if [[ -z "${BANA_SSH_HOST}" || -z "${BANA_SSH_USER}" ]]; then
+              echo "BANA_SSH_KEY requires BANA_SSH_HOST and BANA_SSH_USER."
+              exit 2
+            fi
+
+            install -m 600 /dev/null ~/.ssh/bana_ci_key
+            printf '%s\n' "${BANA_SSH_KEY}" > ~/.ssh/bana_ci_key
+            cat >> ~/.ssh/config <<EOF
+          Host bana-ci-target
+            HostName ${BANA_SSH_HOST}
+            User ${BANA_SSH_USER}
+            IdentityFile ~/.ssh/bana_ci_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking accept-new
+          EOF
+            echo "BANA_SSH_TARGET=bana-ci-target" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Sync checkout to bana
+        run: |
+          set -euo pipefail
+          remote_workdir="${BANA_WORK_ROOT%/}/${GITHUB_REPOSITORY#*/}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "REMOTE_WORKDIR=${remote_workdir}" >> "${GITHUB_ENV}"
+
+          quoted_workdir="$(printf '%q' "${remote_workdir}")"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "${BANA_SSH_TARGET}" \
+            "rm -rf ${quoted_workdir} && mkdir -p ${quoted_workdir}"
+
+          tar \
+            --exclude=.git \
+            --exclude=hardware_test_design/output_files \
+            --exclude=hardware_test_design/db \
+            --exclude=hardware_test_design/incremental_db \
+            --exclude=hardware_test_design/qdb \
+            --exclude=hardware_test_design/work \
+            -czf - . | ssh -o BatchMode=yes "${BANA_SSH_TARGET}" \
+            "tar -xzf - -C ${quoted_workdir}"
+
+      - name: Run remote target
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes "${BANA_SSH_TARGET}" \
+            "REMOTE_WORKDIR=$(printf '%q' "${REMOTE_WORKDIR}") TARGET=$(printf '%q' "${TARGET}") ALTERA_ROOT=$(printf '%q' "${ALTERA_ROOT}") LM_LICENSE_FILE=$(printf '%q' "${LM_LICENSE_FILE}") bash -se" <<'EOF'
+          set -euo pipefail
+          export ALTERA_ROOT
+          export LM_LICENSE_FILE
+          cd "${REMOTE_WORKDIR}"
+          bash scripts/bana_ci.sh "${TARGET}"
+          EOF
