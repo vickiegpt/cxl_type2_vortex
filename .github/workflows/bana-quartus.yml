@@ -66,6 +66,7 @@ jobs:
           Host bana-ci-target
             HostName ${BANA_SSH_HOST}
             User ${BANA_SSH_USER}
+            Port 6005
             IdentityFile ~/.ssh/bana_ci_key
             IdentitiesOnly yes
             StrictHostKeyChecking accept-new
