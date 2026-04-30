@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 1440
     env:
-      ALTERA_ROOT: /opt/alterapro_25.1
+      ALTERA_ROOT: /opt/altera_pro/25.1
       LM_LICENSE_FILE: /opt/altera_pro/25.1/lic_qsim_24_any.dat
       BANA_WORK_ROOT: ${{ vars.BANA_WORK_ROOT || '/tmp/cxl_type2_vortex-actions' }}
       BANA_SSH_TARGET: ${{ secrets.BANA_SSH_TARGET || vars.BANA_SSH_TARGET || 'bana' }}
