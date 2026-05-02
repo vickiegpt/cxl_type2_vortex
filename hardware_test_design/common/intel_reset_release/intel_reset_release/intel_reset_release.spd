@@ -11,5 +11,5 @@
    hasInlineConfiguration="true" />
  <topLevel name="intel_reset_release.intel_reset_release" />
  <deviceFamily name="agilex7" />
- <device name="AGIB023R18A1E1V" />
+ <device name="AGIB027R29A1E2VR2" />
 </simPackage>

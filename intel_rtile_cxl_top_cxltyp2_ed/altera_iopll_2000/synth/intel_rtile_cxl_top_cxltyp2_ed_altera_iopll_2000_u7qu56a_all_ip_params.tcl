@@ -9,7 +9,7 @@ set ::pll_corename intel_rtile_cxl_top_cxltyp2_ed_altera_iopll_2000_u7qu56a
 set ::pll_all_ip_params [dict create]
 
 dict set ::pll_all_ip_params gui_device_family "Agilex 7"
-dict set ::pll_all_ip_params gui_device_component "AGIB023R18A1E1V"
+dict set ::pll_all_ip_params gui_device_component "AGIB027R29A1E2VR2"
 dict set ::pll_all_ip_params gui_device_speed_grade "1"
 dict set ::pll_all_ip_params gui_device_iobank_rev "IO96A_REVB2"
 dict set ::pll_all_ip_params gui_debug_mode "false"
@@ -38,7 +38,7 @@ dict set ::pll_all_ip_params gui_c_cnt_in_src6 "c_m_cnt_in_src_ph_mux_clk"
 dict set ::pll_all_ip_params gui_c_cnt_in_src7 "c_m_cnt_in_src_ph_mux_clk"
 dict set ::pll_all_ip_params gui_c_cnt_in_src8 "c_m_cnt_in_src_ph_mux_clk"
 dict set ::pll_all_ip_params system_info_device_family "Agilex 7"
-dict set ::pll_all_ip_params system_info_device_component "AGIB023R18A1E1V"
+dict set ::pll_all_ip_params system_info_device_component "AGIB027R29A1E2VR2"
 dict set ::pll_all_ip_params system_part_trait_iobank_rev "IO96A_REVB2"
 dict set ::pll_all_ip_params system_info_device_speed_grade "1"
 dict set ::pll_all_ip_params gui_usr_device_speed_grade "1"

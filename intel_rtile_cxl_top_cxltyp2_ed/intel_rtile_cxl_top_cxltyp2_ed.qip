@@ -15,7 +15,7 @@ set_global_assignment -entity "intel_rtile_cxl_top_cxltyp2_ed" -library "intel_r
 set_global_assignment -entity "intel_rtile_cxl_top_cxltyp2_ed" -library "intel_rtile_cxl_top_cxltyp2_ed" -name IP_TARGETED_PART_TRAIT "DEVICE_SPEEDGRADE::1"
 set_global_assignment -entity "intel_rtile_cxl_top_cxltyp2_ed" -library "intel_rtile_cxl_top_cxltyp2_ed" -name IP_TARGETED_PART_TRAIT "BASE_DEVICE::FM8REVA"
 set_global_assignment -entity "intel_rtile_cxl_top_cxltyp2_ed" -library "intel_rtile_cxl_top_cxltyp2_ed" -name IP_TARGETED_PART_TRAIT "part.DEVICE_IOBANK_REVISION::IO96A_REVB2"
-set_global_assignment -entity "intel_rtile_cxl_top_cxltyp2_ed" -library "intel_rtile_cxl_top_cxltyp2_ed" -name IP_TARGETED_PART_TRAIT "DEVICE::AGIB023R18A1E1V"
+set_global_assignment -entity "intel_rtile_cxl_top_cxltyp2_ed" -library "intel_rtile_cxl_top_cxltyp2_ed" -name IP_TARGETED_PART_TRAIT "DEVICE::AGIB027R29A1E2VR2"
 set_global_assignment -entity "intel_rtile_cxl_top_cxltyp2_ed" -library "intel_rtile_cxl_top_cxltyp2_ed" -name IP_GENERATED_DEVICE_FAMILY "{Agilex 7}"
 set_global_assignment -entity "intel_rtile_cxl_top_cxltyp2_ed" -library "intel_rtile_cxl_top_cxltyp2_ed" -name IP_QSYS_MODE "STANDALONE"
 set_global_assignment -name SYNTHESIS_ONLY_QIP ON

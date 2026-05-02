@@ -32,7 +32,7 @@
  </parameter>
  <parameter name="AUTO_DEVICE">
   <type>java.lang.String</type>
-  <value>AGIB023R18A1E1V</value>
+  <value>AGIB027R29A1E2VR2</value>
   <derived>false</derived>
   <enabled>true</enabled>
   <visible>false</visible>

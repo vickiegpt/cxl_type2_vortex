@@ -24,7 +24,7 @@
   <parameter
      name="AUTO_DEVICE"
      type="String"
-     defaultValue="AGIB023R18A1E1V"
+     defaultValue="AGIB027R29A1E2VR2"
      onHdl="0"
      affectsHdl="1" />
   <parameter
@@ -4483,7 +4483,7 @@
   <parameter name="AUTO_REFCLK4_CLOCK_DOMAIN" value="-1" />
   <parameter name="AUTO_UNIQUE_ID" value="" />
   <parameter name="AUTO_DEVICE_SPEEDGRADE" value="1" />
-  <parameter name="AUTO_DEVICE" value="AGIB023R18A1E1V" />
+  <parameter name="AUTO_DEVICE" value="AGIB027R29A1E2VR2" />
   <parameter name="AUTO_REFCLK1_CLOCK_RATE" value="-1" />
   <parameter name="AUTO_REFCLK4_CLOCK_RATE" value="-1" />
   <generatedFiles>
@@ -4659,7 +4659,7 @@
   <parameter name="PF1_DVD_CCRID_SUBCC" value="0" />
   <parameter name="PF1_DEVICE_ID" value="3547" />
   <parameter name="RSPFIFO_DEPTH_WIDTH" value="6" />
-  <parameter name="DEVICE_PART_NO" value="AGIB023R18A1E1V" />
+  <parameter name="DEVICE_PART_NO" value="AGIB027R29A1E2VR2" />
   <parameter name="CXL_SCC_EN" value="true" />
   <parameter name="HDMDECHDR_CAPVER" value="1" />
   <parameter name="PF0_DVD_CCRID_PI" value="0" />
@@ -12020,7 +12020,7 @@
   <parameter
      name="hssi_ctr_u_pcie_top_rnr_pcie_par_p1p3_inst_rnr_pcie_ip4_inst_tlb_err_sts_cfg_mlf_tlp_err_sts_attr"
      value="false" />
-  <parameter name="part_trait_device" value="AGIB023R18A1E1V" />
+  <parameter name="part_trait_device" value="AGIB027R29A1E2VR2" />
   <parameter
      name="hssi_aibnd_tx_13_powermode_freq_hz_aib_hssi_tx_transfer_clk"
      value="800000000" />
@@ -25476,7 +25476,7 @@
   <parameter
      name="hssi_pldadapt_tx_23_fsr_mask_tx_pll_rst_val_hwtcl"
      value="reset_to_zero_maskpll" />
-  <parameter name="device" value="AGIB023R18A1E1V" />
+  <parameter name="device" value="AGIB027R29A1E2VR2" />
   <parameter
      name="hssi_ctr_u_pcie_top_rnr_pcie_par_p0_inst_rnr_pcie_ip16_inst_pf5_ats_capabilities_ctrl_reg_page_aligned_req"
      value="false" />
@@ -32717,7 +32717,7 @@
   <parameter
      name="out_clk_cascading_source"
      value="OUT_CLK_CASCADING_SOURCE_UNUSED" />
-  <parameter name="gui_device_component" value="AGIB023R18A1E1V" />
+  <parameter name="gui_device_component" value="AGIB027R29A1E2VR2" />
   <parameter name="gui_en_hvio_reconf" value="false" />
   <parameter name="gui_pll_auto_reset" value="false" />
   <parameter name="gui_divide_factor_c4" value="6" />
@@ -32886,7 +32886,7 @@
   <parameter name="gui_output_clock_frequency_ps8" value="10000.0" />
   <parameter name="out_clk_2_phase_ps" value="1000000000" />
   <parameter name="gui_extclkout_0_source" value="C0" />
-  <parameter name="system_info_device_component" value="AGIB023R18A1E1V" />
+  <parameter name="system_info_device_component" value="AGIB027R29A1E2VR2" />
   <parameter name="refclk1_frequency" value="0 MHz" />
   <parameter name="clock_name_1" value="sbr_clk" />
   <parameter name="clock_name_2" value="cam_clk" />
@@ -36956,7 +36956,7 @@
   <parameter
      name="hssi_ctr_u_pcie_top_rnr_pcie_par_p1p3_inst_rnr_pcie_ip4_inst_tlb_err_sts_cfg_mlf_tlp_err_sts_attr"
      value="false" />
-  <parameter name="part_trait_device" value="AGIB023R18A1E1V" />
+  <parameter name="part_trait_device" value="AGIB027R29A1E2VR2" />
   <parameter
      name="hssi_aibnd_tx_13_powermode_freq_hz_aib_hssi_tx_transfer_clk"
      value="800000000" />
@@ -50412,7 +50412,7 @@
   <parameter
      name="hssi_pldadapt_tx_23_fsr_mask_tx_pll_rst_val_hwtcl"
      value="reset_to_zero_maskpll" />
-  <parameter name="device" value="AGIB023R18A1E1V" />
+  <parameter name="device" value="AGIB027R29A1E2VR2" />
   <parameter
      name="hssi_ctr_u_pcie_top_rnr_pcie_par_p0_inst_rnr_pcie_ip16_inst_pf5_ats_capabilities_ctrl_reg_page_aligned_req"
      value="false" />
@@ -58466,7 +58466,7 @@
   <parameter
      name="out_clk_cascading_source"
      value="OUT_CLK_CASCADING_SOURCE_UNUSED" />
-  <parameter name="gui_device_component" value="AGIB023R18A1E1V" />
+  <parameter name="gui_device_component" value="AGIB027R29A1E2VR2" />
   <parameter name="gui_en_hvio_reconf" value="false" />
   <parameter name="gui_pll_auto_reset" value="false" />
   <parameter name="gui_divide_factor_c4" value="6" />
@@ -58635,7 +58635,7 @@
   <parameter name="gui_output_clock_frequency_ps8" value="10000.0" />
   <parameter name="out_clk_2_phase_ps" value="1000000000" />
   <parameter name="gui_extclkout_0_source" value="C0" />
-  <parameter name="system_info_device_component" value="AGIB023R18A1E1V" />
+  <parameter name="system_info_device_component" value="AGIB027R29A1E2VR2" />
   <parameter name="refclk1_frequency" value="0 MHz" />
   <parameter name="clock_name_1" value="sbr_clk" />
   <parameter name="clock_name_2" value="cam_clk" />

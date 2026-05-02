@@ -284,7 +284,7 @@
   <parameter name="AUTO_UNIQUE_ID" value="" />
   <parameter name="AUTO_DEVICE_SPEEDGRADE" value="1" />
   <parameter name="AUTO_PLL_REF_CLK_CLOCK_DOMAIN" value="-1" />
-  <parameter name="AUTO_DEVICE" value="AGIB023R18A1E1V" />
+  <parameter name="AUTO_DEVICE" value="AGIB027R29A1E2VR2" />
   <parameter name="AUTO_EMIF_CALBUS_CLK_CLOCK_DOMAIN" value="-1" />
   <parameter name="AUTO_EMIF_CALBUS_CLK_RESET_DOMAIN" value="-1" />
   <parameter name="AUTO_EMIF_CALBUS_CLK_CLOCK_RATE" value="-1" />
@@ -1242,7 +1242,7 @@
   <parameter name="CTRL_DDR3_ECC_STATUS_EN" value="false" />
   <parameter name="PHY_QDR4_AC_DEEMPHASIS_ENUM" value="unset" />
   <parameter name="BOARD_RLD3_USE_DEFAULT_SLEW_RATES" value="true" />
-  <parameter name="SYS_INFO_DEVICE" value="AGIB023R18A1E1V" />
+  <parameter name="SYS_INFO_DEVICE" value="AGIB027R29A1E2VR2" />
   <parameter name="PHY_QDR4_USER_DLL_CORE_UPDN_EN" value="true" />
   <parameter name="PHY_RLD3_AC_SLEW_RATE_ENUM" value="unset" />
   <parameter name="MEM_DDR3_TDQSCKDS" value="450" />
@@ -5659,7 +5659,7 @@
   <parameter name="PHY_RLD2_PLL_REF_CLK_IO_STD_ENUM" value="unset" />
   <parameter name="CTRL_DDR3_ECC_STATUS_EN" value="false" />
   <parameter name="PHY_QDR4_AC_DEEMPHASIS_ENUM" value="unset" />
-  <parameter name="SYS_INFO_DEVICE" value="AGIB023R18A1E1V" />
+  <parameter name="SYS_INFO_DEVICE" value="AGIB027R29A1E2VR2" />
   <parameter name="PHY_QDR4_USER_DLL_CORE_UPDN_EN" value="true" />
   <parameter name="PHY_RLD3_AC_SLEW_RATE_ENUM" value="unset" />
   <parameter name="MEM_DDR3_TDQSCKDS" value="450" />

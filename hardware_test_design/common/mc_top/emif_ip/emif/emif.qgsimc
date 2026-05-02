@@ -9346,7 +9346,7 @@
           </parameter>
           <parameter>
             <name>SYS_INFO_DEVICE</name>
-            <value>AGIB023R18A1E1V</value>
+            <value>AGIB027R29A1E2VR2</value>
           </parameter>
           <parameter>
             <name>SYS_INFO_DEVICE_DIE_REVISIONS</name>
@@ -25133,7 +25133,7 @@
               </parameter>
               <parameter>
                 <name>SYS_INFO_DEVICE</name>
-                <value>AGIB023R18A1E1V</value>
+                <value>AGIB027R29A1E2VR2</value>
               </parameter>
               <parameter>
                 <name>SYS_INFO_DEVICE_DIE_REVISIONS</name>

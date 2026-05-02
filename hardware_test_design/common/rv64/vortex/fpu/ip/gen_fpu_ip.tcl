@@ -9,7 +9,7 @@ package require -exact qsys 24.0
 proc create_fmadd {} {
     create_system acl_fmadd
     set_project_property DEVICE_FAMILY {Agilex 7}
-    set_project_property DEVICE {AGIB023R18A1E1V}
+    set_project_property DEVICE {AGIB027R29A1E2VR2}
 
     # Add clock and reset
     add_instance clk altera_clock_bridge
@@ -56,7 +56,7 @@ proc create_fmadd {} {
 proc create_fdiv {} {
     create_system acl_fdiv
     set_project_property DEVICE_FAMILY {Agilex 7}
-    set_project_property DEVICE {AGIB023R18A1E1V}
+    set_project_property DEVICE {AGIB027R29A1E2VR2}
 
     add_instance clk altera_clock_bridge
     set_instance_parameter_value clk {EXPLICIT_CLOCK_RATE} {0.0}
@@ -96,7 +96,7 @@ proc create_fdiv {} {
 proc create_fsqrt {} {
     create_system acl_fsqrt
     set_project_property DEVICE_FAMILY {Agilex 7}
-    set_project_property DEVICE {AGIB023R18A1E1V}
+    set_project_property DEVICE {AGIB027R29A1E2VR2}
 
     add_instance clk altera_clock_bridge
     set_instance_parameter_value clk {EXPLICIT_CLOCK_RATE} {0.0}

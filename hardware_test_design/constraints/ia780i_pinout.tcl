@@ -10,7 +10,7 @@
 # Intel or its authorized distributors.  Please refer to the applicable 
 # agreement for further details.
 
-set_global_assignment -name DEVICE AGIB023R18A1E1V
+set_global_assignment -name DEVICE AGIB027R29A1E2VR2
 set_global_assignment -name BOARD default
 set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 1
 set_global_assignment -name ENABLE_ED_CRC_CHECK ON

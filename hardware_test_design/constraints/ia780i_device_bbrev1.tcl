@@ -32,8 +32,8 @@
 # Device, configuration, VID
 # --------------------------
 set_global_assignment -name FAMILY "Agilex 7"
-# IA-780i devices: AGIB023R18A1E1V
-set_global_assignment -name DEVICE AGIB023R18A1E1V
+# IA-780i devices: AGIB027R29A1E2VR2
+set_global_assignment -name DEVICE AGIB027R29A1E2VR2
 set_global_assignment -name BOARD default
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 100
