@@ -328,10 +328,10 @@ output matrix. Each thread strides by total thread count.
 ## Building & Testing
 
 ```bash
-# Build GPU kernel
+# Build GPU kernel (RV64 cross-compilation)
 cd kernels && make
 
-# Build test
+# Build GEMM coherency test
 g++ -O2 -std=c++17 -o tests/test_gemm_coherent tests/test_gemm_coherent.cpp -lpthread
 
 # Run (auto-detects real device, falls back to simulation)
@@ -342,16 +342,28 @@ g++ -O2 -std=c++17 -o tests/test_gemm_coherent tests/test_gemm_coherent.cpp -lpt
 
 # With kernel binary (real device)
 ./tests/test_gemm_coherent --kernel kernels/gemm_kernel.bin
+
+# Build FPGA kernels
+g++ -O2 -std=c++17 -o kernels/fpga/fpga_comprehensive_benchmark \
+    kernels/fpga/fpga_comprehensive_benchmark.cpp
+
+# Run benchmarks
+cd benchmarks && bash run_benchmarks.sh
 ```
 
-### Other test programs
+### Test programs
 
-| Binary | Purpose |
+| Source | Purpose |
 |--------|---------|
-| `tests/probe_bar0` | Safe MMIO discovery with SIGBUS recovery |
-| `tests/probe_cxl_deep` | CXL mailbox commands, capability decode |
-| `tests/test_csr_readback` | Vortex CSR write/readback validation |
-| `tests/test_kernel_launch` | Kernel launch + DCOH completion demo |
+| `tests/probe_bar0.cpp` | Safe MMIO discovery with SIGBUS recovery |
+| `tests/probe_cxl_deep.cpp` | CXL mailbox commands, capability decode |
+| `tests/test_csr_readback.cpp` | Vortex CSR write/readback validation |
+| `tests/test_kernel_launch.cpp` | Kernel launch + DCOH completion demo |
+| `tests/test_gemm_coherent.cpp` | GEMM end-to-end test (real device or sim) |
+| `tests/type2_snoop_protocol.cpp` | CXL Type 2 snoop protocol validation |
+| `tests/gemm_realdev_bench.cpp` | GEMM performance benchmark on real device |
+| `tests/phase1_validation.cpp` | Phase 1 CIRA hardware validation |
+| `tests/cira_hw_test.cpp` | CIRA runtime hardware integration test |
 
 ## Device Setup
 
@@ -369,31 +381,80 @@ modprobe cxl_acpi cxl_type2_accel
 daxctl reconfigure-device --mode=devdax dax12.0
 ```
 
-## Key Files
+## Repository Structure
 
 ```
 hardware_test_design/
-  cxltyp2_ed.sv                          Top-level (PCIe PHY + CXL IP)
-  ed_top_wrapper_typ2.sv                  Endpoint wrapper (AFU + CSR + MC)
-  common/afu/afu_top.sv                   AFU: GPU wrapper + AXI arbiter + delay buffer
-  common/mc_top/mc_top.sv                 Memory controller (ECC + EMIF)
-  common/mc_top/hdm_axi_if_pkg.sv        HDM AXI interface (512-bit, 52-bit addr)
+  cxltyp2_ed.sv                                Top-level (PCIe PHY + CXL IP)
+  ed_top_wrapper_typ2.sv                        Endpoint wrapper (AFU + CSR + MC)
+  cxltyp2_ed.qpf / cxltyp2_ed.qsf             Quartus project files
+  flash_bitstream.sh                            FPGA programming script
+  intel_rtile_cxl_top_cxltyp2_ed/             Intel CXL IP component
+  common/afu/afu_top.sv                         AFU: GPU wrapper + AXI arbiter + delay buffer
+  common/mc_top/mc_top.sv                       Memory controller (ECC + EMIF)
   common/mc_top/mc_single_chan_hdm_axi_fsm.sv  AXI→AVMM conversion FSM
   common/ex_default_csr/ex_default_csr_avmm_slave.sv  Register file
-  common/cafu_csr0/cafu_csr0_cfg_pkg.sv   DVSEC reset values (mem_enable fix)
-  common/cafu_csr0/cafu_csr0_cfg.sv       DVSEC register FFs
-  build/cafu_csr0_t2.rdl                  Register Description Language (full map)
+  common/cafu_csr0/cafu_csr0_cfg_pkg.sv         DVSEC reset values (mem_enable fix)
+  common/cafu_csr0/cafu_csr0_cfg.sv             DVSEC register FFs
 
 kernels/
-  gemm_kernel.c                           SIMT GEMM kernel source
-  crt0.S                                  Thread startup (stack + entry)
-  Makefile                                RV64 cross-compilation
-  gemm_kernel.bin                         Compiled binary (824 bytes)
+  gemm_kernel.c                   SIMT GEMM kernel source
+  crt0.S                          Thread startup (stack + entry)
+  lock_kernel.c                   Spinlock kernel
+  spmv_kernel.c                   SpMV kernel
+  prefetch_chain_kernel.c         Prefetch chain kernel
+  prefetch_hash_kernel.c          Prefetch hash kernel
+  prefetch_stream_kernel.c        Prefetch stream kernel
+  vx_intrinsics.h                 Vortex RISC-V intrinsics
+  Makefile                        RV64 cross-compilation
+  fpga/                           FPGA-targeted workload kernels
+    fpga_comprehensive_benchmark.cpp
+    fpga_workload_benchmark.cpp
+    fpga_*_kernel.cpp             Per-workload FPGA kernels
+
+runtime/
+  cira_runtime.cpp / .h           CIRA host runtime
+  mmio_ring_buffer.h              MMIO ring buffer for command dispatch
+  completion_data.h               GPU→host completion struct
+
+compiler/
+  cira_dialect/                   MLIR CIRA dialect (ops, types, TableGen)
+  cira_passes/                    Per-workload CIRA compiler passes
+  profiling/                      CIRA profiler
+
+benchmarks/
+  mcf_cira.cpp                    MCF workload with CIRA instrumentation
+  benchmark_results.csv           Collected benchmark data
+  run_benchmarks.sh               Benchmark driver script
+  llama/                          LLaMA inference benchmarks
+    llama_unified_impl.cpp        Unified LLaMA implementation
+    llama_unified_optimized.cpp   Optimized variant
+    llama_optimized_core.h        Shared optimized primitives
+    llama_benchmark_abc.cpp       ABC benchmark harness
 
 tests/
-  test_gemm_coherent.cpp                  GEMM test (real device + DAX or simulation)
-  probe_bar0.cpp                          BAR0 MMIO region discovery
-  probe_cxl_deep.cpp                      CXL mailbox + register decode
-  test_csr_readback.cpp                   Vortex CSR validation
-  test_kernel_launch.cpp                  Kernel launch + DCOH demo
+  test_gemm_coherent.cpp          GEMM test (real device + DAX or simulation)
+  probe_bar0.cpp                  BAR0 MMIO region discovery
+  probe_cxl_deep.cpp              CXL mailbox + register decode
+  test_csr_readback.cpp           Vortex CSR validation
+  test_kernel_launch.cpp          Kernel launch + DCOH demo
+  type2_snoop_protocol.cpp        CXL Type 2 snoop protocol test
+  type2_snoop_test.cpp            Snoop interaction test
+  gemm_realdev_bench.cpp          Real-device GEMM benchmark
+  cira_hw_test.cpp                CIRA hardware integration test
+  phase1_validation.cpp           Phase 1 hardware validation
+  kernel_loader.cpp / .h          Kernel binary loader utility
+  sim_main.cpp                    Simulation entry point
+  tb_vortex_gpu_wrapper.sv        Vortex GPU wrapper testbench
+
+scripts/
+  bana_ci.sh                      CI script
+  generate_benchmark_results.py   Benchmark result post-processing
+
+docs/
+  OPTIMIZATION_GUIDE.md           Performance tuning guide
+  WORKLOAD_PORTING_GUIDE.md       Porting workloads to CIRA/FPGA
+  LLAMA_CXL_TESTING_GUIDE.md      LLaMA CXL testing guide
+  PHASE3_FPGA_DEPLOYMENT.md       FPGA deployment notes
+  (+ additional session summaries and status reports)
 ```
