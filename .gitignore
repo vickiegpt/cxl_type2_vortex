@@ -6,8 +6,6 @@ build
 qdb
 *.txt
 *.o
-test_*
-!*.cpp
 *.fst
 *.d
 *.hier
@@ -15,3 +13,27 @@ test_*
 work
 *.bin
 *.elf
+*.log
+
+# Compiled test/benchmark binaries (no extension, same name as .cpp)
+tests/check_hdm_hw
+tests/check_hdm_hw2
+tests/cira_optimized
+tests/comprehensive_csr_test
+tests/debug_bar0
+tests/gemm_realdev_bench
+tests/gemm_with_loader
+tests/gpu_deployment_plan
+tests/gpu_snoop_interaction
+tests/llama_*
+tests/perf_patterns_hardware
+tests/phase1_*
+tests/pio_diag
+tests/pio_write_test
+tests/probe_bar0
+tests/probe_cxl_deep
+tests/probe_gpu_csr
+tests/quick_dax_test
+tests/simple_csr_test
+tests/type2_snoop_protocol
+tests/type2_snoop_test
